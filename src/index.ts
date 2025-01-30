@@ -1,5 +1,7 @@
 import type { File } from "@babel/types";
 
+import { join } from "node:path";
+
 import generate from "@babel/generator";
 import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
@@ -20,6 +22,7 @@ import {
   isNumericLiteral,
   isObjectExpression,
   isObjectProperty,
+  isSequenceExpression,
   program,
   stringLiteral,
 } from "@babel/types";
@@ -27,13 +30,24 @@ import { format } from "prettier";
 
 import prettierConfig from "../.prettierrc.json";
 
-interface FusionChunkModule {
-  moduleFile: File;
+export interface FusionChunk {
+  chunkId: number;
+  chunkModules: Record<number, FusionChunkModule>;
 }
 
-async function reUberJs(jsSrc: string) {
-  const m = jsSrc.match(
-    /^(\((self\.webpackChunkFusion)=\2\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\}),\(?(\w)\)?=>\{.*\}]\);\s*$/,
+export interface FusionChunkModule {
+  moduleId: number;
+  moduleFile: File;
+  moduleSource: string;
+  importedModules: number[];
+}
+
+export async function splitFusionChunk(
+  fusionChunkSrc: string,
+  write: false | string,
+): Promise<FusionChunk | null> {
+  const m = fusionChunkSrc.match(
+    /^(\((self\.webpackChunkFusion)=\2\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);\s*$/s,
   );
 
   if (!m) {
@@ -41,15 +55,19 @@ async function reUberJs(jsSrc: string) {
   }
 
   const chunkId = parseInt(m[3]);
-  const chunkModulesSrc = `(${m[4]})`;
+  const chunkModulesSrc = `(${m[4]}, 0)`;
 
-  const chunkModulesFilename = `re/uber/chunk-${chunkId}.js`;
-  const chunkModulesSrcFormattedPromise = format(chunkModulesSrc, {
-    parser: "babel",
-    filepath: chunkModulesFilename,
-  }).then(async (chunkModulesSrcFormatted) => {
-    await Bun.write(chunkModulesFilename, chunkModulesSrcFormatted);
-  });
+  const chunkModulesFilename = write
+    ? join(write, `chunk-${chunkId}.js`)
+    : null;
+  const chunkModulesSrcFormattedPromise = write
+    ? format(chunkModulesSrc, {
+        parser: "babel",
+        filepath: chunkModulesFilename!,
+      }).then(async (chunkModulesSrcFormatted) => {
+        await Bun.write(chunkModulesFilename!, chunkModulesSrcFormatted);
+      })
+    : null;
 
   const ast = parse(chunkModulesSrc);
 
@@ -63,7 +81,13 @@ async function reUberJs(jsSrc: string) {
     return null;
   }
 
-  const rootObjectExpression = rootExpressionStatement.expression;
+  const rootSequenceExpression = rootExpressionStatement.expression;
+
+  if (!isSequenceExpression(rootSequenceExpression)) {
+    return null;
+  }
+
+  const rootObjectExpression = rootSequenceExpression.expressions[0];
 
   if (!isObjectExpression(rootObjectExpression)) {
     return null;
@@ -144,6 +168,8 @@ async function reUberJs(jsSrc: string) {
 
     const moduleFile = file(program(moduleFunction.body.body));
 
+    const importedModules: number[] = [];
+
     traverse(moduleFile, {
       CallExpression(path) {
         if (isMemberExpression(path.node.callee)) {
@@ -218,6 +244,15 @@ async function reUberJs(jsSrc: string) {
 
                       // TODO: void export
                     } else if (isIdentifier(property.value.body)) {
+                      const statementParent = path.getStatementParent();
+
+                      if (!statementParent) {
+                        console.warn(
+                          `[chunk-${chunkId}] [module-${moduleId}] invalid export statement parent`,
+                        );
+                        continue;
+                      }
+
                       const exportedVar = property.value.body.name;
                       const exportAs = property.key.name;
 
@@ -226,11 +261,11 @@ async function reUberJs(jsSrc: string) {
                       );
 
                       if (exportAs === "default") {
-                        path.insertAfter(
+                        statementParent.insertBefore(
                           exportDefaultDeclaration(identifier(exportedVar)),
                         );
                       } else {
-                        path.insertAfter(
+                        statementParent.insertBefore(
                           exportNamedDeclaration(null, [
                             exportSpecifier(
                               identifier(exportedVar),
@@ -258,24 +293,6 @@ async function reUberJs(jsSrc: string) {
               }
             }
           }
-        } else if (isIdentifier(path.node.callee)) {
-          // if (path.node.callee.name === chunkModuleParams[2]) {
-          //   if (
-          //     path.node.arguments.length !== 1 ||
-          //     !isNumericLiteral(path.node.arguments[0])
-          //   ) {
-          //     console.warn(
-          //       `[chunk-${chunkId}] [module-${moduleId}] invalid import arguments: ${path.node.arguments.length}`,
-          //     );
-          //     return;
-          //   }
-          //   const importModuleId = path.node.arguments[0].value;
-          //   path.replaceWith(
-          //     awaitExpression(
-          //       importExpression(stringLiteral(`./${importModuleId}`)),
-          //     ),
-          //   );
-          // }
         }
       },
       VariableDeclarator(path) {
@@ -319,17 +336,15 @@ async function reUberJs(jsSrc: string) {
                 ),
               );
               path.remove();
+
+              importedModules.push(importModuleId);
             }
           }
         }
       },
     });
 
-    chunkModules[moduleId] = {
-      moduleFile,
-    };
-
-    const filename = `re/uber/${moduleId}.js`;
+    const filename = write ? join(write, `${moduleId}.js`) : undefined;
 
     const moduleCode = generate(moduleFile, { filename }).code;
 
@@ -340,18 +355,62 @@ async function reUberJs(jsSrc: string) {
       ...prettierConfig,
     });
 
-    await Bun.write(
-      filename,
-      `\
+    chunkModules[moduleId] = {
+      moduleId,
+      moduleFile,
+      moduleSource: formattedModuleCode,
+      importedModules,
+    };
+
+    if (write) {
+      await Bun.write(
+        filename!,
+        `\
 /*
  * Fusion chunk ${chunkId} module ${moduleId}
  */
 
 ${formattedModuleCode}`,
-    );
+      );
+    }
   }
 
   await chunkModulesSrcFormattedPromise;
+
+  return { chunkId, chunkModules };
 }
 
-await reUberJs(await Bun.file("re/client-main-0b201948680a8c81.js").text());
+if (import.meta.main) {
+  const importedModules = new Set<number>();
+  const declaredModules = new Set<number>();
+
+  for (const arg of process.argv.slice(2)) {
+    const chunk = await splitFusionChunk(
+      await Bun.file(arg).text(),
+      "re/modules",
+    );
+
+    if (!chunk) {
+      console.warn(`[chunk-${arg}] invalid chunk`);
+      continue;
+    }
+
+    for (const moduleId in chunk.chunkModules) {
+      const module = chunk.chunkModules[moduleId];
+
+      for (const importedModule of module.importedModules) {
+        importedModules.add(importedModule);
+      }
+
+      declaredModules.add(module.moduleId);
+    }
+  }
+
+  const undeclaredModules = importedModules.difference(declaredModules);
+
+  if (undeclaredModules.size) {
+    console.warn(
+      `undeclared modules: ${Array.from(undeclaredModules).join(", ")}`,
+    );
+  }
+}
