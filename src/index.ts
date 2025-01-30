@@ -107,7 +107,7 @@ export async function splitFusionChunk(
     }
 
     if (!isObjectProperty(property)) {
-      console.warn("chunk module is not an object property");
+      console.warn("Chunk module is not an object property:", property.type);
       continue;
     }
 
@@ -118,12 +118,16 @@ export async function splitFusionChunk(
         if (fusionModuleMatch) {
           const fusionModuleId = parseInt(fusionModuleMatch[1]);
 
+          console.group(`Fusion module ${fusionModuleId}:`);
+          isInModuleGroup = true;
+
           // TODO
+          console.warn(`Fusion modules not implemented`);
           continue;
         }
       }
 
-      console.warn("invalid chunk module key");
+      console.warn("Invalid chunk module key:", property.key.type);
       continue;
     }
 
@@ -133,7 +137,7 @@ export async function splitFusionChunk(
     isInModuleGroup = true;
 
     if (!isArrowFunctionExpression(property.value)) {
-      console.warn("invalid chunk module value");
+      console.warn("Invalid chunk module value:", property.value.type);
       continue;
     }
 
@@ -141,7 +145,8 @@ export async function splitFusionChunk(
 
     if (moduleFunction.params.length > 3) {
       console.warn(
-        `too many chunk module function params: ${moduleFunction.params.length}`,
+        "Too many chunk module function params:",
+        moduleFunction.params.length,
       );
       continue;
     }
@@ -150,13 +155,13 @@ export async function splitFusionChunk(
       const param = moduleFunction.params[i];
 
       if (!isIdentifier(param)) {
-        console.warn("invalid chunk module function param");
+        console.warn("Invalid chunk module function param:", param.type);
         continue chunkModulesLoop;
       }
 
       if (chunkModuleParams[i]) {
         if (chunkModuleParams[i] !== param.name) {
-          console.warn(`invalid chunk module function param: ${param.name}`);
+          console.warn("Invalid chunk module function param:", param.name);
           continue chunkModulesLoop;
         }
       } else {
@@ -165,7 +170,10 @@ export async function splitFusionChunk(
     }
 
     if (!isBlockStatement(moduleFunction.body)) {
-      console.warn("invalid chunk module function body");
+      console.warn(
+        "Invalid chunk module function body:",
+        moduleFunction.body.type,
+      );
       continue;
     }
 
@@ -182,7 +190,8 @@ export async function splitFusionChunk(
                 if (path.node.callee.property.name === "d") {
                   if (path.node.arguments.length !== 2) {
                     console.warn(
-                      `invalid export arguments: ${path.node.arguments.length}`,
+                      "Invalid export arguments:",
+                      path.node.arguments.length,
                     );
                     return;
                   }
@@ -191,12 +200,18 @@ export async function splitFusionChunk(
                     !isIdentifier(path.node.arguments[0]) ||
                     path.node.arguments[0].name !== chunkModuleParams[1]
                   ) {
-                    console.warn("invalid export first argument");
+                    console.warn(
+                      "Invalid export first argument:",
+                      path.node.arguments[0].type,
+                    );
                     return;
                   }
 
                   if (!isObjectExpression(path.node.arguments[1])) {
-                    console.warn(`invalid exports`);
+                    console.warn(
+                      "Invalid exports:",
+                      path.node.arguments[1].type,
+                    );
                     return;
                   }
 
@@ -208,37 +223,50 @@ export async function splitFusionChunk(
 
                   for (const property of path.node.arguments[1].properties) {
                     if (!isObjectProperty(property)) {
-                      console.warn(`invalid export`);
+                      console.warn("Invalid export:", property.type);
                       continue;
                     }
 
                     if (!isIdentifier(property.key)) {
-                      console.warn(`invalid export property key`);
+                      console.warn(
+                        "Invalid export property key:",
+                        property.key.type,
+                      );
                       continue;
                     }
 
                     if (!isArrowFunctionExpression(property.value)) {
-                      console.warn(`invalid export property value`);
+                      console.warn(
+                        "Invalid export property value:",
+                        property.value.type,
+                      );
                       continue;
                     }
 
                     if (property.value.params.length) {
-                      console.warn(`invalid export property value params`);
+                      console.warn(
+                        "Invalid export property value params:",
+                        property.value.params.length,
+                      );
                       continue;
                     }
 
                     if (isBlockStatement(property.value.body)) {
                       if (property.value.body.body.length) {
-                        console.warn(`invalid export property value body`);
+                        console.warn(
+                          "Invalid export property value body:",
+                          property.value.body.body.length,
+                        );
                         continue;
                       }
 
                       // TODO: void export
+                      console.warn("Void exports not implemented");
                     } else if (isIdentifier(property.value.body)) {
                       const statementParent = path.getStatementParent();
 
                       if (!statementParent) {
-                        console.warn(`invalid export statement parent`);
+                        console.warn("No statement parent for export found");
                         continue;
                       }
 
@@ -246,7 +274,10 @@ export async function splitFusionChunk(
                       const exportAs = property.key.name;
 
                       console.debug(
-                        `rewriting export ${exportedVar} as ${exportAs}`,
+                        "Rewriting export",
+                        exportedVar,
+                        "\tas",
+                        exportAs,
                       );
 
                       if (exportAs === "default") {
@@ -264,18 +295,15 @@ export async function splitFusionChunk(
                         );
                       }
                     } else {
-                      console.warn("invalid export property value body");
+                      console.warn(
+                        "Invalid export property value body:",
+                        property.value.body.type,
+                      );
                       continue;
                     }
                   }
 
                   console.groupEnd();
-
-                  path.addComment(
-                    "leading",
-                    "Fusion chunk module exports",
-                    true,
-                  );
 
                   path.remove();
                 }
@@ -297,20 +325,27 @@ export async function splitFusionChunk(
             if (!path.scope.hasBinding(path.node.init.callee.name)) {
               if (path.node.init.arguments.length !== 1) {
                 console.warn(
-                  `invalid number of import arguments: ${path.node.init.arguments.length}`,
+                  "Invalid number of import arguments:",
+                  path.node.init.arguments.length,
                 );
                 return;
               }
 
               if (!isNumericLiteral(path.node.init.arguments[0])) {
-                console.warn(`invalid import argument`);
+                console.warn(
+                  "Invalid import argument:",
+                  path.node.init.arguments[0].type,
+                );
                 return;
               }
 
               const importModuleId = path.node.init.arguments[0].value;
 
               if (!isIdentifier(path.node.id)) {
-                console.warn("non-identifier imports are not implemented");
+                console.warn(
+                  "Non-identifier imports are not implemented, got:",
+                  path.node.id.type,
+                );
                 return;
               }
 
@@ -382,7 +417,7 @@ if (import.meta.main) {
     );
 
     if (!chunk) {
-      console.warn("invalid chunk");
+      console.warn("Invalid chunk:", arg);
       continue;
     }
 
