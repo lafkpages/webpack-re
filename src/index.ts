@@ -521,10 +521,9 @@ if (import.meta.main) {
   const declaredModules = new Set<number>();
 
   for (const arg of process.argv.slice(2)) {
-    const chunk = await splitFusionChunk(
-      await Bun.file(arg).text(),
-      "re/modules",
-    );
+    const chunk = await splitFusionChunk(await Bun.file(arg).text(), {
+      write: "re/modules",
+    });
 
     if (!chunk) {
       console.warn("Invalid chunk:", arg);
