@@ -200,7 +200,11 @@ export async function splitFusionChunk(
                     return;
                   }
 
-                  console.debug(`rewriting exports`);
+                  console.group(
+                    "Rewriting",
+                    path.node.arguments[1].properties.length,
+                    "exports:",
+                  );
 
                   for (const property of path.node.arguments[1].properties) {
                     if (!isObjectProperty(property)) {
@@ -264,6 +268,8 @@ export async function splitFusionChunk(
                       continue;
                     }
                   }
+
+                  console.groupEnd();
 
                   path.addComment(
                     "leading",
@@ -395,7 +401,8 @@ if (import.meta.main) {
 
   if (undeclaredModules.size) {
     console.warn(
-      `undeclared modules: ${Array.from(undeclaredModules).join(", ")}`,
+      "Some modules were imported but not declared, across all input files:",
+      undeclaredModules,
     );
   }
 }
