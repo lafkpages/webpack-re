@@ -27,6 +27,7 @@ import {
   stringLiteral,
 } from "@babel/types";
 import { format } from "prettier";
+import reserved from "reserved";
 
 import prettierConfig from "../.prettierrc.json";
 
@@ -273,7 +274,7 @@ export async function splitFusionChunk(
                       const exportedVar = property.value.body.name;
                       const exportAs = property.key.name;
 
-                      console.debug(
+                      console.log(
                         "Rewriting export",
                         exportedVar,
                         "\tas",
@@ -361,6 +362,43 @@ export async function splitFusionChunk(
             }
           }
         }
+      },
+      ExportSpecifier(path) {
+        if (!isIdentifier(path.node.exported)) {
+          console.warn(
+            "Non-identifier exports should be unreachable, got:",
+            path.node.exported.type,
+          );
+          return;
+        }
+
+        if (path.node.local.name === path.node.exported.name) {
+          return;
+        }
+
+        let renameTo = path.node.exported.name;
+
+        if (reserved.includes(renameTo)) {
+          renameTo = `_${renameTo}`;
+        }
+
+        if (path.scope.hasBinding(renameTo)) {
+          console.warn(
+            "Cannot rename local to match export,",
+            renameTo,
+            "is already bound",
+          );
+          return;
+        }
+
+        path.scope.rename(path.node.local.name, renameTo);
+
+        console.log(
+          "Renamed local",
+          path.node.local.name,
+          "to match export:",
+          renameTo,
+        );
       },
     });
 
