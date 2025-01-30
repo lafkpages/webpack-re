@@ -51,7 +51,7 @@ export interface FusionChunkModule {
 export async function splitFusionChunk(
   fusionChunkSrc: string,
   {
-    esmDefaultExports = false,
+    esmDefaultExports = true,
     write,
   }: {
     esmDefaultExports?: boolean;
@@ -206,6 +206,10 @@ export async function splitFusionChunk(
 
         if (moduleHasDefaultExport) {
           console.log("Multiple default exports found, assuming CommonJS");
+          moduleIsCommonJS = true;
+          path.stop();
+        } else if (isObjectExpression(defaultExport)) {
+          console.log("Default export is an object, assuming CommonJS");
           moduleIsCommonJS = true;
           path.stop();
         }
