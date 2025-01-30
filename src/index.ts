@@ -42,9 +42,12 @@ export interface FusionChunk {
 }
 
 export interface FusionChunkModule {
-  moduleId: number;
-  moduleFile: File;
-  moduleSource: string;
+  id: number;
+
+  file: File;
+  source: string;
+
+  isCommonJS: boolean;
   importedModules: number[];
 }
 
@@ -490,9 +493,12 @@ export async function splitFusionChunk(
     });
 
     chunkModules[moduleId] = {
-      moduleId,
-      moduleFile,
-      moduleSource: formattedModuleCode,
+      id: moduleId,
+
+      file: moduleFile,
+      source: formattedModuleCode,
+
+      isCommonJS: moduleIsCommonJS,
       importedModules,
     };
 
@@ -501,7 +507,7 @@ export async function splitFusionChunk(
         filename!,
         `\
 /*
- * Fusion chunk ${chunkId} module ${moduleId}
+ * Fusion chunk ${chunkId}, ${moduleIsCommonJS ? "CJS" : "ESM"} module ${moduleId}
  */
 
 ${formattedModuleCode}`,
@@ -541,7 +547,7 @@ if (import.meta.main) {
         importedModules.add(importedModule);
       }
 
-      declaredModules.add(module.moduleId);
+      declaredModules.add(module.id);
     }
   }
 
