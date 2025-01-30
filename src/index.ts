@@ -14,6 +14,7 @@ import {
   identifier,
   importDeclaration,
   importNamespaceSpecifier,
+  importSpecifier,
   isArrowFunctionExpression,
   isBlockStatement,
   isCallExpression,
@@ -34,7 +35,7 @@ import { format } from "prettier";
 import reserved from "reserved";
 
 import prettierConfig from "../.prettierrc.json";
-import { getDefaultExport } from "./ast";
+import { getDefaultExport, parseImportCall } from "./ast";
 
 export interface FusionChunk {
   chunkId: number;
@@ -354,51 +355,74 @@ export async function splitFusionChunk(
       },
       VariableDeclarator(path) {
         if (isCallExpression(path.node.init)) {
-          if (
-            isIdentifier(path.node.init.callee) &&
-            path.node.init.callee.name === chunkModuleParams[2]
-          ) {
-            // If there is no binding to the import function, it will
-            // be the chunk module function param, since this is out
-            // of scope of moduleFile
+          const importModuleId = parseImportCall(
+            path.node.init,
+            path.scope,
+            chunkModuleParams,
+          );
 
-            if (!path.scope.hasBinding(path.node.init.callee.name)) {
-              if (path.node.init.arguments.length !== 1) {
-                console.warn(
-                  "Invalid number of import arguments:",
-                  path.node.init.arguments.length,
-                );
-                return;
-              }
+          if (importModuleId === null) {
+            return;
+          }
 
-              if (!isNumericLiteral(path.node.init.arguments[0])) {
-                console.warn(
-                  "Invalid import argument:",
-                  path.node.init.arguments[0].type,
-                );
-                return;
-              }
+          importedModules.push(importModuleId);
 
-              const importModuleId = path.node.init.arguments[0].value;
+          if (!isIdentifier(path.node.id)) {
+            console.warn(
+              "Non-identifier imports are not implemented, got:",
+              path.node.id.type,
+            );
+            return;
+          }
 
-              if (!isIdentifier(path.node.id)) {
-                console.warn(
-                  "Non-identifier imports are not implemented, got:",
-                  path.node.id.type,
-                );
-                return;
-              }
+          // TODO: use statementParent
 
-              path.parentPath.insertBefore(
-                importDeclaration(
-                  [importNamespaceSpecifier(identifier(path.node.id.name))],
-                  stringLiteral(`./${importModuleId}`),
-                ),
-              );
-              path.remove();
+          path.parentPath.insertBefore(
+            importDeclaration(
+              [importNamespaceSpecifier(identifier(path.node.id.name))],
+              stringLiteral(`./${importModuleId}`),
+            ),
+          );
+          path.remove();
+        } else if (isMemberExpression(path.node.init)) {
+          if (isCallExpression(path.node.init.object)) {
+            const importModuleId = parseImportCall(
+              path.node.init.object,
+              path.scope,
+              chunkModuleParams,
+            );
 
-              importedModules.push(importModuleId);
+            if (importModuleId === null) {
+              return;
             }
+
+            importedModules.push(importModuleId);
+
+            if (!isIdentifier(path.node.id)) {
+              console.warn(
+                "Non-identifier imports are not implemented, got:",
+                path.node.id.type,
+              );
+              return;
+            }
+
+            if (!isIdentifier(path.node.init.property)) {
+              console.warn(
+                "Non-identifier import accessors are not implemented, got:",
+                path.node.init.property.type,
+              );
+              return;
+            }
+
+            // TODO: use statementParent
+
+            path.parentPath.insertBefore(
+              importDeclaration(
+                [importSpecifier(path.node.id, path.node.init.property)],
+                stringLiteral(`./${importModuleId}`),
+              ),
+            );
+            path.remove();
           }
         }
       },
