@@ -6,6 +6,7 @@ import generate from "@babel/generator";
 import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
 import {
+  assignmentExpression,
   exportDefaultDeclaration,
   exportNamedDeclaration,
   exportSpecifier,
@@ -23,13 +24,17 @@ import {
   isObjectExpression,
   isObjectProperty,
   isSequenceExpression,
+  memberExpression,
   program,
   stringLiteral,
+  variableDeclaration,
+  variableDeclarator,
 } from "@babel/types";
 import { format } from "prettier";
 import reserved from "reserved";
 
 import prettierConfig from "../.prettierrc.json";
+import { getDefaultExport } from "./ast";
 
 export interface FusionChunk {
   chunkId: number;
@@ -181,6 +186,27 @@ export async function splitFusionChunk(
     const moduleFile = file(program(moduleFunction.body.body));
 
     const importedModules: number[] = [];
+
+    let moduleIsCommonJS = false;
+    let moduleHasDefaultExport = false;
+
+    traverse(moduleFile, {
+      AssignmentExpression(path) {
+        const defaultExport = getDefaultExport(path, chunkModuleParams);
+
+        if (!defaultExport) {
+          return;
+        }
+
+        if (moduleHasDefaultExport) {
+          console.log("Multiple default exports found, assuming CommonJS");
+          moduleIsCommonJS = true;
+          path.stop();
+        }
+
+        moduleHasDefaultExport = true;
+      },
+    });
 
     traverse(moduleFile, {
       CallExpression(path) {
@@ -362,6 +388,46 @@ export async function splitFusionChunk(
             }
           }
         }
+      },
+      AssignmentExpression(path) {
+        const defaultExport = getDefaultExport(path, chunkModuleParams);
+
+        if (!defaultExport) {
+          return;
+        }
+
+        const statementParent = path.getStatementParent();
+
+        if (!statementParent) {
+          console.warn("No statement parent for default exports found");
+          return;
+        }
+
+        if (moduleIsCommonJS) {
+          console.log("Rewriting default exports as CommonJS");
+
+          path.replaceWith(
+            assignmentExpression(
+              "=",
+              memberExpression(identifier("module"), identifier("exports")),
+              defaultExport,
+            ),
+          );
+
+          return;
+        }
+
+        console.log("Rewriting default exports");
+
+        const exportsId = path.scope.generateUidIdentifier("exports");
+        statementParent.insertBefore(
+          variableDeclaration("const", [
+            variableDeclarator(exportsId, defaultExport),
+          ]),
+        );
+        statementParent.insertBefore(exportDefaultDeclaration(exportsId));
+
+        path.replaceWith(exportsId);
       },
       ExportSpecifier(path) {
         if (!isIdentifier(path.node.exported)) {
