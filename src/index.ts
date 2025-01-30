@@ -25,6 +25,8 @@ import {
 } from "@babel/types";
 import { format } from "prettier";
 
+import prettierConfig from "../.prettierrc.json";
+
 interface FusionChunkModule {
   moduleFile: File;
 }
@@ -41,10 +43,12 @@ async function reUberJs(jsSrc: string) {
   const chunkId = parseInt(m[3]);
   const chunkModulesSrc = `(${m[4]})`;
 
+  const chunkModulesFilename = `re/uber/chunk-${chunkId}.js`;
   const chunkModulesSrcFormattedPromise = format(chunkModulesSrc, {
     parser: "babel",
+    filepath: chunkModulesFilename,
   }).then(async (chunkModulesSrcFormatted) => {
-    await Bun.write(`re/uber/${chunkId}/chunk.js`, chunkModulesSrcFormatted);
+    await Bun.write(chunkModulesFilename, chunkModulesSrcFormatted);
   });
 
   const ast = parse(chunkModulesSrc);
@@ -325,13 +329,26 @@ async function reUberJs(jsSrc: string) {
       moduleFile,
     };
 
-    const filename = `re/uber/${chunkId}/${moduleId}.js`;
+    const filename = `re/uber/${moduleId}.js`;
 
-    const moduleCode = generate(moduleFile, {
-      filename,
+    const moduleCode = generate(moduleFile, { filename }).code;
+
+    const formattedModuleCode = await format(moduleCode, {
+      parser: "babel",
+      filepath: filename,
+
+      ...prettierConfig,
     });
 
-    await Bun.write(filename, moduleCode.code);
+    await Bun.write(
+      filename,
+      `\
+/*
+ * Fusion chunk ${chunkId} module ${moduleId}
+ */
+
+${formattedModuleCode}`,
+    );
   }
 
   await chunkModulesSrcFormattedPromise;
