@@ -57,6 +57,8 @@ export async function splitFusionChunk(
   const chunkId = parseInt(m[3]);
   const chunkModulesSrc = `(${m[4]}, 0)`;
 
+  console.group(`Chunk ${chunkId}:`);
+
   const chunkModulesFilename = write
     ? join(write, `chunk-${chunkId}.js`)
     : null;
@@ -97,9 +99,15 @@ export async function splitFusionChunk(
 
   let chunkModuleParams: string[] = [];
 
+  let isInModuleGroup = false;
   chunkModulesLoop: for (const property of rootObjectExpression.properties) {
+    if (isInModuleGroup) {
+      console.groupEnd();
+      isInModuleGroup = false;
+    }
+
     if (!isObjectProperty(property)) {
-      console.warn(`[chunk-${chunkId}] chunk module is not an object property`);
+      console.warn("chunk module is not an object property");
       continue;
     }
 
@@ -115,16 +123,17 @@ export async function splitFusionChunk(
         }
       }
 
-      console.warn(`[chunk-${chunkId}] invalid chunk module key`);
+      console.warn("invalid chunk module key");
       continue;
     }
 
     const moduleId = property.key.value;
 
+    console.group(`Module ${moduleId}:`);
+    isInModuleGroup = true;
+
     if (!isArrowFunctionExpression(property.value)) {
-      console.warn(
-        `[chunk-${chunkId}] [module-${moduleId}] invalid chunk module value`,
-      );
+      console.warn("invalid chunk module value");
       continue;
     }
 
@@ -132,7 +141,7 @@ export async function splitFusionChunk(
 
     if (moduleFunction.params.length > 3) {
       console.warn(
-        `[chunk-${chunkId}] [module-${moduleId}] too many chunk module function params: ${moduleFunction.params.length}`,
+        `too many chunk module function params: ${moduleFunction.params.length}`,
       );
       continue;
     }
@@ -141,17 +150,13 @@ export async function splitFusionChunk(
       const param = moduleFunction.params[i];
 
       if (!isIdentifier(param)) {
-        console.warn(
-          `[chunk-${chunkId}] [module-${moduleId}] invalid chunk module function param`,
-        );
+        console.warn("invalid chunk module function param");
         continue chunkModulesLoop;
       }
 
       if (chunkModuleParams[i]) {
         if (chunkModuleParams[i] !== param.name) {
-          console.warn(
-            `[chunk-${chunkId}] [module-${moduleId}] invalid chunk module function param: ${param.name}`,
-          );
+          console.warn(`invalid chunk module function param: ${param.name}`);
           continue chunkModulesLoop;
         }
       } else {
@@ -160,9 +165,7 @@ export async function splitFusionChunk(
     }
 
     if (!isBlockStatement(moduleFunction.body)) {
-      console.warn(
-        `[chunk-${chunkId}] [module-${moduleId}] invalid chunk module function body`,
-      );
+      console.warn("invalid chunk module function body");
       continue;
     }
 
@@ -179,7 +182,7 @@ export async function splitFusionChunk(
                 if (path.node.callee.property.name === "d") {
                   if (path.node.arguments.length !== 2) {
                     console.warn(
-                      `[chunk-${chunkId}] [module-${moduleId}] invalid export arguments: ${path.node.arguments.length}`,
+                      `invalid export arguments: ${path.node.arguments.length}`,
                     );
                     return;
                   }
@@ -188,57 +191,41 @@ export async function splitFusionChunk(
                     !isIdentifier(path.node.arguments[0]) ||
                     path.node.arguments[0].name !== chunkModuleParams[1]
                   ) {
-                    console.warn(
-                      `[chunk-${chunkId}] [module-${moduleId}] invalid export first argument`,
-                    );
+                    console.warn("invalid export first argument");
                     return;
                   }
 
                   if (!isObjectExpression(path.node.arguments[1])) {
-                    console.warn(
-                      `[chunk-${chunkId}] [module-${moduleId}] invalid exports`,
-                    );
+                    console.warn(`invalid exports`);
                     return;
                   }
 
-                  console.debug(
-                    `[chunk-${chunkId}] [module-${moduleId}] rewriting exports`,
-                  );
+                  console.debug(`rewriting exports`);
 
                   for (const property of path.node.arguments[1].properties) {
                     if (!isObjectProperty(property)) {
-                      console.warn(
-                        `[chunk-${chunkId}] [module-${moduleId}] invalid export`,
-                      );
+                      console.warn(`invalid export`);
                       continue;
                     }
 
                     if (!isIdentifier(property.key)) {
-                      console.warn(
-                        `[chunk-${chunkId}] [module-${moduleId}] invalid export property key`,
-                      );
+                      console.warn(`invalid export property key`);
                       continue;
                     }
 
                     if (!isArrowFunctionExpression(property.value)) {
-                      console.warn(
-                        `[chunk-${chunkId}] [module-${moduleId}] invalid export property value`,
-                      );
+                      console.warn(`invalid export property value`);
                       continue;
                     }
 
                     if (property.value.params.length) {
-                      console.warn(
-                        `[chunk-${chunkId}] [module-${moduleId}] invalid export property value params`,
-                      );
+                      console.warn(`invalid export property value params`);
                       continue;
                     }
 
                     if (isBlockStatement(property.value.body)) {
                       if (property.value.body.body.length) {
-                        console.warn(
-                          `[chunk-${chunkId}] [module-${moduleId}] invalid export property value body`,
-                        );
+                        console.warn(`invalid export property value body`);
                         continue;
                       }
 
@@ -247,9 +234,7 @@ export async function splitFusionChunk(
                       const statementParent = path.getStatementParent();
 
                       if (!statementParent) {
-                        console.warn(
-                          `[chunk-${chunkId}] [module-${moduleId}] invalid export statement parent`,
-                        );
+                        console.warn(`invalid export statement parent`);
                         continue;
                       }
 
@@ -257,7 +242,7 @@ export async function splitFusionChunk(
                       const exportAs = property.key.name;
 
                       console.debug(
-                        `[chunk-${chunkId}] [module-${moduleId}] rewriting export ${exportedVar} as ${exportAs}`,
+                        `rewriting export ${exportedVar} as ${exportAs}`,
                       );
 
                       if (exportAs === "default") {
@@ -275,9 +260,7 @@ export async function splitFusionChunk(
                         );
                       }
                     } else {
-                      console.warn(
-                        `[chunk-${chunkId}] [module-${moduleId}] invalid export property value body`,
-                      );
+                      console.warn("invalid export property value body");
                       continue;
                     }
                   }
@@ -308,24 +291,20 @@ export async function splitFusionChunk(
             if (!path.scope.hasBinding(path.node.init.callee.name)) {
               if (path.node.init.arguments.length !== 1) {
                 console.warn(
-                  `[chunk-${chunkId}] [module-${moduleId}] invalid number of import arguments: ${path.node.init.arguments.length}`,
+                  `invalid number of import arguments: ${path.node.init.arguments.length}`,
                 );
                 return;
               }
 
               if (!isNumericLiteral(path.node.init.arguments[0])) {
-                console.warn(
-                  `[chunk-${chunkId}] [module-${moduleId}] invalid import argument`,
-                );
+                console.warn(`invalid import argument`);
                 return;
               }
 
               const importModuleId = path.node.init.arguments[0].value;
 
               if (!isIdentifier(path.node.id)) {
-                console.warn(
-                  `[chunk-${chunkId}] [module-${moduleId}] non-identifier imports are not implemented`,
-                );
+                console.warn("non-identifier imports are not implemented");
                 return;
               }
 
@@ -375,7 +354,13 @@ ${formattedModuleCode}`,
     }
   }
 
+  if (isInModuleGroup) {
+    console.groupEnd();
+  }
+
   await chunkModulesSrcFormattedPromise;
+
+  console.groupEnd();
 
   return { chunkId, chunkModules };
 }
@@ -391,7 +376,7 @@ if (import.meta.main) {
     );
 
     if (!chunk) {
-      console.warn(`[chunk-${arg}] invalid chunk`);
+      console.warn("invalid chunk");
       continue;
     }
 
