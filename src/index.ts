@@ -50,7 +50,13 @@ export interface FusionChunkModule {
 
 export async function splitFusionChunk(
   fusionChunkSrc: string,
-  write: false | string,
+  {
+    esmDefaultExports = false,
+    write,
+  }: {
+    esmDefaultExports?: boolean;
+    write: false | string;
+  },
 ): Promise<FusionChunk | null> {
   const m = fusionChunkSrc.match(
     /^(\((self\.webpackChunkFusion)=\2\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);\s*$/s,
@@ -403,7 +409,7 @@ export async function splitFusionChunk(
           return;
         }
 
-        if (moduleIsCommonJS) {
+        if (moduleIsCommonJS || !esmDefaultExports) {
           console.log("Rewriting default exports as CommonJS");
 
           path.replaceWith(
