@@ -433,13 +433,6 @@ export async function splitFusionChunk(
           return;
         }
 
-        const statementParent = path.getStatementParent();
-
-        if (!statementParent) {
-          console.warn("No statement parent for default exports found");
-          return;
-        }
-
         if (moduleIsCommonJS || !esmDefaultExports) {
           console.log("Rewriting default exports as CommonJS");
 
@@ -456,15 +449,26 @@ export async function splitFusionChunk(
 
         console.log("Rewriting default exports");
 
-        const exportsId = path.scope.generateUidIdentifier("exports");
-        statementParent.insertBefore(
-          variableDeclaration("const", [
-            variableDeclarator(exportsId, defaultExport),
-          ]),
-        );
-        statementParent.insertBefore(exportDefaultDeclaration(exportsId));
+        if (isExpressionStatement(path.parent)) {
+          path.parentPath.replaceWith(exportDefaultDeclaration(defaultExport));
+        } else {
+          const statementParent = path.getStatementParent();
 
-        path.replaceWith(exportsId);
+          if (!statementParent) {
+            console.warn("No statement parent for default exports found");
+            return;
+          }
+
+          const exportsId = path.scope.generateUidIdentifier("exports");
+          statementParent.insertBefore(
+            variableDeclaration("const", [
+              variableDeclarator(exportsId, defaultExport),
+            ]),
+          );
+          statementParent.insertBefore(exportDefaultDeclaration(exportsId));
+
+          path.replaceWith(exportsId);
+        }
       },
       ImportSpecifier(path) {
         if (!isIdentifier(path.node.imported)) {
