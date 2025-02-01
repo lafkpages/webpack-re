@@ -466,6 +466,43 @@ export async function splitFusionChunk(
 
         path.replaceWith(exportsId);
       },
+      ImportSpecifier(path) {
+        if (!isIdentifier(path.node.imported)) {
+          console.warn(
+            "Non-identifier imports should be unreachable, got:",
+            path.node.imported.type,
+          );
+          return;
+        }
+
+        if (path.node.local.name === path.node.imported.name) {
+          return;
+        }
+
+        let renameTo = path.node.imported.name;
+
+        if (reserved.includes(renameTo)) {
+          renameTo = `_${renameTo}`;
+        }
+
+        if (path.scope.hasBinding(renameTo)) {
+          console.warn(
+            "Cannot rename local to match import,",
+            renameTo,
+            "is already bound",
+          );
+          return;
+        }
+
+        path.scope.rename(path.node.local.name, renameTo);
+
+        console.log(
+          "Renamed local",
+          path.node.local.name,
+          "to match import:",
+          renameTo,
+        );
+      },
       ExportSpecifier(path) {
         if (!isIdentifier(path.node.exported)) {
           console.warn(
