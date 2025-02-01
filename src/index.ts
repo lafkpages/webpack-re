@@ -375,9 +375,14 @@ export async function splitFusionChunk(
             return;
           }
 
-          // TODO: use statementParent
+          const statementParent = path.getStatementParent();
 
-          path.parentPath.insertBefore(
+          if (!statementParent) {
+            console.warn("No statement parent for import found");
+            return;
+          }
+
+          statementParent.insertBefore(
             importDeclaration(
               [importNamespaceSpecifier(identifier(path.node.id.name))],
               stringLiteral(`./${importModuleId}`),
@@ -414,9 +419,14 @@ export async function splitFusionChunk(
               return;
             }
 
-            // TODO: use statementParent
+            const statementParent = path.getStatementParent();
 
-            path.parentPath.insertBefore(
+            if (!statementParent) {
+              console.warn("No statement parent for import found");
+              return;
+            }
+
+            statementParent.insertBefore(
               importDeclaration(
                 [importSpecifier(path.node.id, path.node.init.property)],
                 stringLiteral(`./${importModuleId}`),
