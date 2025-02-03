@@ -29,7 +29,6 @@ import {
   isObjectProperty,
   isSequenceExpression,
   memberExpression,
-  numericLiteral,
   program,
   stringLiteral,
   variableDeclaration,
@@ -386,7 +385,7 @@ export async function splitFusionChunk(
 
             path.replaceWith(
               callExpression(identifier("require"), [
-                numericLiteral(importModuleId),
+                stringLiteral(`./${importModuleId}`),
               ]),
             );
 
@@ -423,7 +422,7 @@ export async function splitFusionChunk(
               variableDeclarator(
                 path.node.id,
                 callExpression(identifier("require"), [
-                  numericLiteral(importModuleId),
+                  stringLiteral(`./${importModuleId}`),
                 ]),
               ),
             );
