@@ -416,6 +416,21 @@ export async function splitFusionChunk(
 
           importedModules.push(importModuleId);
 
+          if (moduleIsCommonJS) {
+            console.log("Rewriting import call as require");
+
+            path.replaceWith(
+              variableDeclarator(
+                path.node.id,
+                callExpression(identifier("require"), [
+                  numericLiteral(importModuleId),
+                ]),
+              ),
+            );
+
+            return;
+          }
+
           if (!isIdentifier(path.node.id)) {
             console.warn(
               "Non-identifier imports are not implemented, got:",
