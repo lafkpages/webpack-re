@@ -34,6 +34,7 @@ import {
   variableDeclaration,
   variableDeclarator,
 } from "@babel/types";
+import Graph, { MultiDirectedGraph } from "graphology";
 import { format } from "prettier";
 import reserved from "reserved";
 
@@ -59,9 +60,13 @@ export async function splitFusionChunk(
   fusionChunkSrc: string,
   {
     esmDefaultExports = true,
+    graph,
     write,
   }: {
     esmDefaultExports?: boolean;
+
+    graph?: Graph;
+
     write: false | string;
   },
 ): Promise<FusionChunk | null> {
@@ -154,6 +159,8 @@ export async function splitFusionChunk(
 
     console.group(`Module ${moduleId}:`);
     isInModuleGroup = true;
+
+    graph?.mergeNode(moduleId);
 
     if (!isArrowFunctionExpression(property.value)) {
       console.warn("Invalid chunk module value:", property.value.type);
@@ -366,6 +373,8 @@ export async function splitFusionChunk(
           }
 
           importedModules.push(importModuleId);
+          graph?.mergeNode(importModuleId);
+          graph?.addEdge(moduleId, importModuleId);
 
           // TODO: check if await is allowed in scope
 
@@ -414,6 +423,8 @@ export async function splitFusionChunk(
           }
 
           importedModules.push(importModuleId);
+          graph?.mergeNode(importModuleId);
+          graph?.addEdge(moduleId, importModuleId);
 
           if (moduleIsCommonJS) {
             console.log("Rewriting import call as require");
@@ -465,6 +476,8 @@ export async function splitFusionChunk(
             }
 
             importedModules.push(importModuleId);
+            graph?.mergeNode(importModuleId);
+            graph?.addEdge(moduleId, importModuleId);
 
             if (!isIdentifier(path.node.id)) {
               console.warn(
@@ -668,8 +681,11 @@ if (import.meta.main) {
   const importedModules = new Set<number>();
   const declaredModules = new Set<number>();
 
+  const graph = new MultiDirectedGraph();
+
   for (const arg of process.argv.slice(2)) {
     const chunk = await splitFusionChunk(await Bun.file(arg).text(), {
+      graph,
       write: "re/modules",
     });
 
@@ -697,4 +713,6 @@ if (import.meta.main) {
       undeclaredModules,
     );
   }
+
+  await Bun.write("re/modules/graph.json", JSON.stringify(graph.export()));
 }
