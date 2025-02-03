@@ -7,12 +7,15 @@ import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
 import {
   assignmentExpression,
+  awaitExpression,
+  callExpression,
   exportDefaultDeclaration,
   exportNamedDeclaration,
   exportSpecifier,
   file,
   identifier,
   importDeclaration,
+  importExpression,
   importNamespaceSpecifier,
   importSpecifier,
   isArrowFunctionExpression,
@@ -26,6 +29,7 @@ import {
   isObjectProperty,
   isSequenceExpression,
   memberExpression,
+  numericLiteral,
   program,
   stringLiteral,
   variableDeclaration,
@@ -351,6 +355,49 @@ export async function splitFusionChunk(
               }
             }
           }
+        } else {
+          const importModuleId = parseImportCall(
+            path.node,
+            path.scope,
+            chunkModuleParams,
+          );
+
+          if (importModuleId === null) {
+            return;
+          }
+
+          // TODO: check if await is allowed in scope
+
+          let useRequire = moduleIsCommonJS;
+
+          if (!moduleIsCommonJS) {
+            const functionParent = path.getFunctionParent();
+
+            if (functionParent?.node.async === false) {
+              // If the parent function is not async, we cannot use await
+              useRequire = true;
+            }
+          }
+
+          if (useRequire) {
+            console.log("Rewriting import call as require");
+
+            path.replaceWith(
+              callExpression(identifier("require"), [
+                numericLiteral(importModuleId),
+              ]),
+            );
+
+            return;
+          }
+
+          console.log("Rewriting import call");
+
+          path.replaceWith(
+            awaitExpression(
+              importExpression(stringLiteral(`./${importModuleId}`)),
+            ),
+          );
         }
       },
       VariableDeclarator(path) {
