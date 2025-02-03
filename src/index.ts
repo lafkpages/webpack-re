@@ -366,6 +366,8 @@ export async function splitFusionChunk(
             return;
           }
 
+          importedModules.push(importModuleId);
+
           // TODO: check if await is allowed in scope
 
           let useRequire = moduleIsCommonJS;
