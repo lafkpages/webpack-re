@@ -1,6 +1,7 @@
 import { MultiDirectedGraph } from "graphology";
 
-import { splitFusionChunk } from ".";
+import { splitFusionChunk } from "..";
+import { buildGraphPage } from "./graph";
 
 if (!import.meta.main) {
   throw new Error("CLI should not be imported as a module");
@@ -45,34 +46,4 @@ if (undeclaredModules.size) {
 const graphExportData = JSON.stringify(graph.export());
 
 await Bun.write("re/modules/graph/data.json", graphExportData);
-
-// const graphExportData = await Bun.file("re/modules/graph/data.json").text();
-
-await Bun.build({
-  entrypoints: ["./src/graph.html"],
-  outdir: "re/modules/graph",
-  minify: true,
-  plugins: [
-    {
-      name: "inject-graph-data",
-      setup({ onLoad }) {
-        const rewriter = new HTMLRewriter().on("#graph-data", {
-          text(element) {
-            if (element.text === "data") {
-              element.replace(graphExportData);
-            }
-          },
-        });
-
-        onLoad({ filter: /graph\.html$/ }, async (args) => {
-          const html = await Bun.file(args.path).text();
-
-          return {
-            contents: rewriter.transform(html),
-            loader: "html",
-          };
-        });
-      },
-    },
-  ],
-});
+await buildGraphPage(graphExportData);
