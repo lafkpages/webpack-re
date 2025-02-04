@@ -11,3 +11,6 @@ circular.assign(graph);
 forceAtlas2.assign(graph, 50);
 
 const sigma = new Sigma(graph, document.getElementById("container"));
+
+window.graph = graph;
+window.sigma = sigma;
