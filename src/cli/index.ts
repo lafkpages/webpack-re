@@ -44,6 +44,6 @@ if (undeclaredModules.size) {
 }
 
 const graphExportData = JSON.stringify(graph.export());
-
 await Bun.write("re/modules/graph/data.json", graphExportData);
-await buildGraphPage(graphExportData);
+
+await buildGraphPage(graph);

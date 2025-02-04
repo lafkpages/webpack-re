@@ -1,4 +1,13 @@
-export async function buildGraphPage(graphExportData: string) {
+import { MultiDirectedGraph } from "graphology";
+import { circular } from "graphology-layout";
+import forceAtlas2 from "graphology-layout-forceatlas2";
+
+export async function buildGraphPage(graph: MultiDirectedGraph) {
+  circular.assign(graph);
+  forceAtlas2.assign(graph, 500);
+
+  const graphExportData = JSON.stringify(graph.export());
+
   return await Bun.build({
     entrypoints: ["./src/graph.html"],
     outdir: "re/modules/graph",
@@ -30,6 +39,9 @@ export async function buildGraphPage(graphExportData: string) {
 }
 
 if (import.meta.main) {
-  const graphExportData = await Bun.file("re/modules/graph/data.json").text();
-  await buildGraphPage(graphExportData);
+  const graph = new MultiDirectedGraph();
+
+  graph.import(await Bun.file("re/modules/graph/data.json").json());
+
+  await buildGraphPage(graph);
 }
