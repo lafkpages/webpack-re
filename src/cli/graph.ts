@@ -9,7 +9,7 @@ export async function buildGraphPage(graph: MultiDirectedGraph) {
   const graphExportData = JSON.stringify(graph.export());
 
   return await Bun.build({
-    entrypoints: ["./src/graph.html"],
+    entrypoints: ["./src/cli/graph.html"],
     outdir: "re/modules/graph",
     minify: true,
     plugins: [
