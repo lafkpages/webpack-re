@@ -27,21 +27,29 @@ const chunksPalette = iwanthue(chunkCount);
 
 graph.forEachNode((node, attr) => {
   attr.label = node;
-  attr.size = Math.sqrt(graph.outDegree(node) + 1);
 
-  if (typeof attr.chunkId === "number") {
-    if (!chunks[attr.chunkId]) {
+  /**
+   * @type {number|null}
+   */
+  const chunkId = typeof attr.chunkId === "number" ? attr.chunkId : null;
+
+  if (chunkId !== null) {
+    if (!chunks[chunkId]) {
       const color = chunksPalette.pop();
 
       if (!color) {
         throw new Error("Palette exhausted");
       }
 
-      chunks[attr.chunkId] = color;
+      chunks[chunkId] = color;
     }
 
-    attr.color = chunks[attr.chunkId];
+    attr.color = chunks[chunkId];
+
+    attr.label += ` (${chunkId})`;
   }
+
+  attr.size = Math.sqrt(graph.outDegree(node) + 1);
 });
 
 graph.forEachEdge((edge, attr) => {
