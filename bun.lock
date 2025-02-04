@@ -15,6 +15,7 @@
         "graphology": "^0.26.0",
         "graphology-layout": "^0.6.1",
         "graphology-layout-forceatlas2": "^0.10.1",
+        "iwanthue": "^2.0.0",
         "prettier": "^3.4.2",
         "reserved": "^0.1.2",
         "sigma": "^3.0.1",
@@ -80,6 +81,8 @@
     "graphology-types": ["graphology-types@0.24.8", "", {}, "sha512-hDRKYXa8TsoZHjgEaysSRyPdT6uB78Ci8WnjgbStlQysz7xR52PInxNsmnB7IBOM1BhikxkNyCVEFgmPKnpx3Q=="],
 
     "graphology-utils": ["graphology-utils@2.5.2", "", { "peerDependencies": { "graphology-types": ">=0.23.0" } }, "sha512-ckHg8MXrXJkOARk56ZaSCM1g1Wihe2d6iTmz1enGOz4W/l831MBCKSayeFQfowgF8wd+PQ4rlch/56Vs/VZLDQ=="],
+
+    "iwanthue": ["iwanthue@2.0.0", "", { "dependencies": { "obliterator": "^2.0.3" } }, "sha512-baARnKbEygsic78ekXFxvEfVyiWPchkeoUYy6StEhjF4ayCanBZQhEiXlzPXIUXtgVCYyvwex0dnw1Ghg8UCCg=="],
 
     "js-tokens": ["js-tokens@4.0.0", "", {}, "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="],
 

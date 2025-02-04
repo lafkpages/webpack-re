@@ -2,11 +2,22 @@ import { MultiDirectedGraph } from "graphology";
 import { circular } from "graphology-layout";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 
-export async function buildGraphPage(graph: MultiDirectedGraph) {
+export interface GraphData {
+  graphData: ReturnType<MultiDirectedGraph["export"]>;
+  chunkCount: number;
+}
+
+export async function buildGraphPage(
+  graph: MultiDirectedGraph,
+  chunkCount: number,
+) {
   circular.assign(graph);
   forceAtlas2.assign(graph, 500);
 
-  const graphExportData = JSON.stringify(graph.export());
+  const graphData = JSON.stringify({
+    graphData: graph.export(),
+    chunkCount,
+  } satisfies GraphData);
 
   return await Bun.build({
     entrypoints: ["./src/cli/graph.html"],
@@ -19,7 +30,7 @@ export async function buildGraphPage(graph: MultiDirectedGraph) {
           const rewriter = new HTMLRewriter().on("#graph-data", {
             text(element) {
               if (element.text === "data") {
-                element.replace(graphExportData);
+                element.replace(graphData);
               }
             },
           });
@@ -39,9 +50,11 @@ export async function buildGraphPage(graph: MultiDirectedGraph) {
 }
 
 if (import.meta.main) {
-  const graph = MultiDirectedGraph.from(
-    await Bun.file("re/modules/graph/data.json").json(),
-  );
+  const { graphData, chunkCount } = (await Bun.file(
+    "re/modules/graph/data.json",
+  ).json()) as GraphData;
 
-  await buildGraphPage(graph);
+  const graph = MultiDirectedGraph.from(graphData);
+
+  await buildGraphPage(graph, chunkCount);
 }

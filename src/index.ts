@@ -160,7 +160,7 @@ export async function splitFusionChunk(
     console.group(`Module ${moduleId}:`);
     isInModuleGroup = true;
 
-    graph?.mergeNode(moduleId);
+    graph?.mergeNode(moduleId, { chunkId });
 
     if (!isArrowFunctionExpression(property.value)) {
       console.warn("Invalid chunk module value:", property.value.type);

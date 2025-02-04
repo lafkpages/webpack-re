@@ -1,3 +1,5 @@
+import type { GraphData } from "./graph";
+
 import { MultiDirectedGraph } from "graphology";
 
 import { splitFusionChunk } from "..";
@@ -12,6 +14,8 @@ const declaredModules = new Set<number>();
 
 const graph = new MultiDirectedGraph();
 
+let chunkCount = 0;
+
 for (const arg of process.argv.slice(2)) {
   const chunk = await splitFusionChunk(await Bun.file(arg).text(), {
     graph,
@@ -22,6 +26,8 @@ for (const arg of process.argv.slice(2)) {
     console.warn("Invalid chunk:", arg);
     continue;
   }
+
+  chunkCount++;
 
   for (const moduleId in chunk.chunkModules) {
     const module = chunk.chunkModules[moduleId];
@@ -43,7 +49,10 @@ if (undeclaredModules.size) {
   );
 }
 
-const graphExportData = JSON.stringify(graph.export());
-await Bun.write("re/modules/graph/data.json", graphExportData);
+const graphData = JSON.stringify({
+  graphData: graph.export(),
+  chunkCount,
+} satisfies GraphData);
+await Bun.write("re/modules/graph/data.json", graphData);
 
-await buildGraphPage(graph);
+await buildGraphPage(graph, chunkCount);
