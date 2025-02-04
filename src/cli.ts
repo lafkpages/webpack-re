@@ -42,4 +42,37 @@ if (undeclaredModules.size) {
   );
 }
 
-await Bun.write("re/modules/graph.json", JSON.stringify(graph.export()));
+const graphExportData = JSON.stringify(graph.export());
+
+await Bun.write("re/modules/graph/data.json", graphExportData);
+
+// const graphExportData = await Bun.file("re/modules/graph/data.json").text();
+
+await Bun.build({
+  entrypoints: ["./src/graph.html"],
+  outdir: "re/modules/graph",
+  minify: true,
+  plugins: [
+    {
+      name: "inject-graph-data",
+      setup({ onLoad }) {
+        const rewriter = new HTMLRewriter().on("#graph-data", {
+          text(element) {
+            if (element.text === "data") {
+              element.replace(graphExportData);
+            }
+          },
+        });
+
+        onLoad({ filter: /graph\.html$/ }, async (args) => {
+          const html = await Bun.file(args.path).text();
+
+          return {
+            contents: rewriter.transform(html),
+            loader: "html",
+          };
+        });
+      },
+    },
+  ],
+});
