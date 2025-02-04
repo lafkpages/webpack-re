@@ -39,9 +39,9 @@ export async function buildGraphPage(graph: MultiDirectedGraph) {
 }
 
 if (import.meta.main) {
-  const graph = new MultiDirectedGraph();
-
-  graph.import(await Bun.file("re/modules/graph/data.json").json());
+  const graph = MultiDirectedGraph.from(
+    await Bun.file("re/modules/graph/data.json").json(),
+  );
 
   await buildGraphPage(graph);
 }
