@@ -160,7 +160,7 @@ export async function splitFusionChunk(
     console.group(`Module ${moduleId}:`);
     isInModuleGroup = true;
 
-    graph?.mergeNode(moduleId, { label: moduleId });
+    graph?.mergeNode(moduleId);
 
     if (!isArrowFunctionExpression(property.value)) {
       console.warn("Invalid chunk module value:", property.value.type);
@@ -373,7 +373,7 @@ export async function splitFusionChunk(
           }
 
           importedModules.push(importModuleId);
-          graph?.mergeNode(importModuleId, { label: importModuleId });
+          graph?.mergeNode(importModuleId);
           graph?.addEdge(moduleId, importModuleId);
 
           // TODO: check if await is allowed in scope
@@ -423,7 +423,7 @@ export async function splitFusionChunk(
           }
 
           importedModules.push(importModuleId);
-          graph?.mergeNode(importModuleId, { label: importModuleId });
+          graph?.mergeNode(importModuleId);
           graph?.addEdge(moduleId, importModuleId);
 
           if (moduleIsCommonJS) {
@@ -476,7 +476,7 @@ export async function splitFusionChunk(
             }
 
             importedModules.push(importModuleId);
-            graph?.mergeNode(importModuleId, { label: importModuleId });
+            graph?.mergeNode(importModuleId);
             graph?.addEdge(moduleId, importModuleId);
 
             if (!isIdentifier(path.node.id)) {
