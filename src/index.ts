@@ -232,6 +232,10 @@ export async function splitFusionChunk(
       },
     });
 
+    if (moduleIsCommonJS) {
+      graph?.mergeNode(moduleId, { type: "square" });
+    }
+
     traverse(moduleFile, {
       CallExpression(path) {
         if (isMemberExpression(path.node.callee)) {

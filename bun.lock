@@ -9,6 +9,7 @@
         "@babel/traverse": "^7.26.7",
         "@babel/types": "^7.26.7",
         "@ianvs/prettier-plugin-sort-imports": "^4.4.1",
+        "@sigma/node-square": "^3.0.0",
         "@types/babel__generator": "^7.6.8",
         "@types/babel__traverse": "^7.20.6",
         "@types/bun": "latest",
@@ -53,6 +54,8 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.0", "", {}, "sha512-gv3ZRaISU3fjPAgNsriBRqGWQL6quFx04YMPW/zD8XMLsU32mhCCbfbO6KZFLjvYpCZ8zyDEgqsgf+PwPaM7GQ=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.25", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ=="],
+
+    "@sigma/node-square": ["@sigma/node-square@3.0.0", "", { "peerDependencies": { "sigma": ">=3.0.0-beta.17" } }, "sha512-hPX2oWo7WeaSe6M3D56AXsrLyg3F+7N/YsodaJh4Sw3KTce0GAFVWWPZZklu9CITz0xi3kEmlCGulqAH0cVG2w=="],
 
     "@types/babel__generator": ["@types/babel__generator@7.6.8", "", { "dependencies": { "@babel/types": "^7.0.0" } }, "sha512-ASsj+tpEDsEiFr1arWrlN6V3mdfjRMZt6LtK/Vp/kreFLnr5QH5+DhvD5nINYZXzwJvXeGq+05iUXcAzVrqWtw=="],
 

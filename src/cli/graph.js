@@ -1,8 +1,10 @@
 // @ts-check
 
+import { NodeSquareProgram } from "@sigma/node-square";
 import { MultiDirectedGraph } from "graphology";
 import iwanthue from "iwanthue";
 import Sigma from "sigma";
+import { NodeCircleProgram } from "sigma/rendering";
 
 const graphDataElm = document.getElementById("graph-data");
 
@@ -56,7 +58,12 @@ graph.forEachEdge((edge, attr) => {
   attr.type = "arrow";
 });
 
-const sigma = new Sigma(graph, container);
+const sigma = new Sigma(graph, container, {
+  nodeProgramClasses: {
+    circle: NodeCircleProgram,
+    square: NodeSquareProgram,
+  },
+});
 
 // @ts-expect-error
 window.graph = graph;
