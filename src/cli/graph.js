@@ -20,7 +20,7 @@ if (!container) {
 const graph = MultiDirectedGraph.from(graphData);
 
 /**
- * @type {Record<string, string>}
+ * @type {Record<number, string>}
  */
 const chunks = {};
 const chunksPalette = iwanthue(chunkCount);
@@ -29,9 +29,15 @@ graph.forEachNode((node, attr) => {
   attr.label = node;
   attr.size = Math.sqrt(graph.outDegree(node) + 1);
 
-  if (typeof attr.chunkId === "string") {
+  if (typeof attr.chunkId === "number") {
     if (!chunks[attr.chunkId]) {
-      chunks[attr.chunkId] === chunksPalette.pop();
+      const color = chunksPalette.pop();
+
+      if (!color) {
+        throw new Error("Palette exhausted");
+      }
+
+      chunks[attr.chunkId] = color;
     }
 
     attr.color = chunks[attr.chunkId];
