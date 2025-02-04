@@ -10,6 +10,10 @@ graph.forEachNode((node, attr) => {
   attr.size = Math.sqrt(graph.outDegree(node) + 1);
 });
 
+graph.forEachEdge((edge, attr) => {
+  attr.type = "arrow";
+});
+
 const sigma = new Sigma(graph, document.getElementById("container"));
 
 window.graph = graph;
