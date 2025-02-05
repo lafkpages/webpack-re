@@ -71,15 +71,15 @@ export async function splitFusionChunk(
   },
 ): Promise<FusionChunk | null> {
   const m = fusionChunkSrc.match(
-    /^(\((self\.webpackChunkFusion)=\2\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);\s*$/s,
+    /^(?:(["'])use strict\1;)?(\((self\.webpackChunkFusion)=\3\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);\s*$/s,
   );
 
   if (!m) {
     return null;
   }
 
-  const chunkId = parseInt(m[3]);
-  const chunkModulesSrc = `(${m[4]}, 0)`;
+  const chunkId = parseInt(m[4]);
+  const chunkModulesSrc = `(${m[5]}, 0)`;
 
   console.group(`Chunk ${chunkId}:`);
 
