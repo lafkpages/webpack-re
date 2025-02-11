@@ -328,8 +328,8 @@ export async function splitFusionChunk(
 
                       moduleLogger.log(
                         "Rewriting export",
-                        exportedVar,
-                        "\tas",
+                        exportedVar.padEnd(5),
+                        "as",
                         exportAs,
                       );
 
