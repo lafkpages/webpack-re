@@ -1,5 +1,6 @@
 import type { NodePath, Scope } from "@babel/traverse";
 import type { AssignmentExpression, CallExpression } from "@babel/types";
+import type { ConsolaInstance } from "consola";
 
 import {
   isIdentifier,
@@ -8,6 +9,7 @@ import {
 } from "@babel/types";
 
 export function getDefaultExport(
+  moduleLogger: ConsolaInstance,
   path: NodePath<AssignmentExpression>,
   chunkModuleParams: string[],
 ) {
@@ -20,7 +22,10 @@ export function getDefaultExport(
     path.node.left.property.name === "exports"
   ) {
     if (path.node.operator !== "=") {
-      console.warn("Invalid default exports operator:", path.node.operator);
+      moduleLogger.warn(
+        "Invalid default exports operator:",
+        path.node.operator,
+      );
       return null;
     }
 
@@ -31,6 +36,7 @@ export function getDefaultExport(
 }
 
 export function parseImportCall(
+  moduleLogger: ConsolaInstance,
   callExpression: CallExpression,
   scope: Scope,
   chunkModuleParams: string[],
@@ -45,7 +51,7 @@ export function parseImportCall(
 
     if (!scope.hasBinding(callExpression.callee.name)) {
       if (callExpression.arguments.length !== 1) {
-        console.warn(
+        moduleLogger.warn(
           "Invalid number of import arguments:",
           callExpression.arguments.length,
         );
@@ -53,7 +59,7 @@ export function parseImportCall(
       }
 
       if (!isNumericLiteral(callExpression.arguments[0])) {
-        console.warn(
+        moduleLogger.warn(
           "Invalid import argument:",
           callExpression.arguments[0].type,
         );

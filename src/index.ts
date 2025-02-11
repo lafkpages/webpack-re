@@ -35,6 +35,7 @@ import {
   variableDeclaration,
   variableDeclarator,
 } from "@babel/types";
+import consola from "consola";
 import { format } from "prettier";
 import reserved from "reserved";
 
@@ -81,7 +82,7 @@ export async function splitFusionChunk(
   const chunkId = parseInt(m[4]);
   const chunkModulesSrc = `(${m[5]}, 0)`;
 
-  console.group(`Chunk ${chunkId}:`);
+  const chunkLogger = consola.withTag(`chunk-${chunkId}`);
 
   const chunkModulesFilename = write
     ? join(write, `chunk-${chunkId}.js`)
@@ -123,15 +124,12 @@ export async function splitFusionChunk(
 
   let chunkModuleParams: string[] = [];
 
-  let isInModuleGroup = false;
   chunkModulesLoop: for (const property of rootObjectExpression.properties) {
-    if (isInModuleGroup) {
-      console.groupEnd();
-      isInModuleGroup = false;
-    }
-
     if (!isObjectProperty(property)) {
-      console.warn("Chunk module is not an object property:", property.type);
+      chunkLogger.warn(
+        "Chunk module is not an object property:",
+        property.type,
+      );
       continue;
     }
 
@@ -142,35 +140,35 @@ export async function splitFusionChunk(
         if (fusionModuleMatch) {
           const fusionModuleId = parseInt(fusionModuleMatch[1]);
 
-          console.group(`Fusion module ${fusionModuleId}:`);
-          isInModuleGroup = true;
+          const moduleLogger = chunkLogger.withTag(
+            `fusion-module-${fusionModuleId}`,
+          );
 
           // TODO
-          console.warn(`Fusion modules not implemented`);
+          moduleLogger.warn(`Fusion modules not implemented`);
           continue;
         }
       }
 
-      console.warn("Invalid chunk module key:", property.key.type);
+      chunkLogger.warn("Invalid chunk module key:", property.key.type);
       continue;
     }
 
     const moduleId = property.key.value;
 
-    console.group(`Module ${moduleId}:`);
-    isInModuleGroup = true;
+    const moduleLogger = chunkLogger.withTag(`module-${moduleId}`);
 
     graph?.mergeNode(moduleId, { chunkId });
 
     if (!isArrowFunctionExpression(property.value)) {
-      console.warn("Invalid chunk module value:", property.value.type);
+      moduleLogger.warn("Invalid chunk module value:", property.value.type);
       continue;
     }
 
     const moduleFunction = property.value;
 
     if (moduleFunction.params.length > 3) {
-      console.warn(
+      moduleLogger.warn(
         "Too many chunk module function params:",
         moduleFunction.params.length,
       );
@@ -181,13 +179,13 @@ export async function splitFusionChunk(
       const param = moduleFunction.params[i];
 
       if (!isIdentifier(param)) {
-        console.warn("Invalid chunk module function param:", param.type);
+        moduleLogger.warn("Invalid chunk module function param:", param.type);
         continue chunkModulesLoop;
       }
 
       if (chunkModuleParams[i]) {
         if (chunkModuleParams[i] !== param.name) {
-          console.warn("Invalid chunk module function param:", param.name);
+          moduleLogger.warn("Invalid chunk module function param:", param.name);
           continue chunkModulesLoop;
         }
       } else {
@@ -196,7 +194,7 @@ export async function splitFusionChunk(
     }
 
     if (!isBlockStatement(moduleFunction.body)) {
-      console.warn(
+      moduleLogger.warn(
         "Invalid chunk module function body:",
         moduleFunction.body.type,
       );
@@ -212,18 +210,22 @@ export async function splitFusionChunk(
 
     traverse(moduleFile, {
       AssignmentExpression(path) {
-        const defaultExport = getDefaultExport(path, chunkModuleParams);
+        const defaultExport = getDefaultExport(
+          moduleLogger,
+          path,
+          chunkModuleParams,
+        );
 
         if (!defaultExport) {
           return;
         }
 
         if (moduleHasDefaultExport) {
-          console.log("Multiple default exports found, assuming CommonJS");
+          moduleLogger.log("Multiple default exports found, assuming CommonJS");
           moduleIsCommonJS = true;
           path.stop();
         } else if (isObjectExpression(defaultExport)) {
-          console.log("Default export is an object, assuming CommonJS");
+          moduleLogger.log("Default export is an object, assuming CommonJS");
           moduleIsCommonJS = true;
           path.stop();
         }
@@ -244,7 +246,7 @@ export async function splitFusionChunk(
               if (isIdentifier(path.node.callee.property)) {
                 if (path.node.callee.property.name === "d") {
                   if (path.node.arguments.length !== 2) {
-                    console.warn(
+                    moduleLogger.warn(
                       "Invalid export arguments:",
                       path.node.arguments.length,
                     );
@@ -255,7 +257,7 @@ export async function splitFusionChunk(
                     !isIdentifier(path.node.arguments[0]) ||
                     path.node.arguments[0].name !== chunkModuleParams[1]
                   ) {
-                    console.warn(
+                    moduleLogger.warn(
                       "Invalid export first argument:",
                       path.node.arguments[0].type,
                     );
@@ -263,27 +265,21 @@ export async function splitFusionChunk(
                   }
 
                   if (!isObjectExpression(path.node.arguments[1])) {
-                    console.warn(
+                    moduleLogger.warn(
                       "Invalid exports:",
                       path.node.arguments[1].type,
                     );
                     return;
                   }
 
-                  console.group(
-                    "Rewriting",
-                    path.node.arguments[1].properties.length,
-                    "exports:",
-                  );
-
                   for (const property of path.node.arguments[1].properties) {
                     if (!isObjectProperty(property)) {
-                      console.warn("Invalid export:", property.type);
+                      moduleLogger.warn("Invalid export:", property.type);
                       continue;
                     }
 
                     if (!isIdentifier(property.key)) {
-                      console.warn(
+                      moduleLogger.warn(
                         "Invalid export property key:",
                         property.key.type,
                       );
@@ -291,7 +287,7 @@ export async function splitFusionChunk(
                     }
 
                     if (!isArrowFunctionExpression(property.value)) {
-                      console.warn(
+                      moduleLogger.warn(
                         "Invalid export property value:",
                         property.value.type,
                       );
@@ -299,7 +295,7 @@ export async function splitFusionChunk(
                     }
 
                     if (property.value.params.length) {
-                      console.warn(
+                      moduleLogger.warn(
                         "Invalid export property value params:",
                         property.value.params.length,
                       );
@@ -308,7 +304,7 @@ export async function splitFusionChunk(
 
                     if (isBlockStatement(property.value.body)) {
                       if (property.value.body.body.length) {
-                        console.warn(
+                        moduleLogger.warn(
                           "Invalid export property value body:",
                           property.value.body.body.length,
                         );
@@ -316,19 +312,21 @@ export async function splitFusionChunk(
                       }
 
                       // TODO: void export
-                      console.warn("Void exports not implemented");
+                      moduleLogger.warn("Void exports not implemented");
                     } else if (isIdentifier(property.value.body)) {
                       const statementParent = path.getStatementParent();
 
                       if (!statementParent) {
-                        console.warn("No statement parent for export found");
+                        moduleLogger.warn(
+                          "No statement parent for export found",
+                        );
                         continue;
                       }
 
                       const exportedVar = property.value.body.name;
                       const exportAs = property.key.name;
 
-                      console.log(
+                      moduleLogger.log(
                         "Rewriting export",
                         exportedVar,
                         "\tas",
@@ -350,15 +348,13 @@ export async function splitFusionChunk(
                         );
                       }
                     } else {
-                      console.warn(
+                      moduleLogger.warn(
                         "Invalid export property value body:",
                         property.value.body.type,
                       );
                       continue;
                     }
                   }
-
-                  console.groupEnd();
 
                   path.remove();
                 }
@@ -367,6 +363,7 @@ export async function splitFusionChunk(
           }
         } else {
           const importModuleId = parseImportCall(
+            moduleLogger,
             path.node,
             path.scope,
             chunkModuleParams,
@@ -394,7 +391,7 @@ export async function splitFusionChunk(
           }
 
           if (useRequire) {
-            console.log("Rewriting import call as require");
+            moduleLogger.log("Rewriting import call as require");
 
             path.replaceWith(
               callExpression(identifier("require"), [
@@ -405,7 +402,7 @@ export async function splitFusionChunk(
             return;
           }
 
-          console.log("Rewriting import call");
+          moduleLogger.log("Rewriting import call");
 
           path.replaceWith(
             awaitExpression(
@@ -417,6 +414,7 @@ export async function splitFusionChunk(
       VariableDeclarator(path) {
         if (isCallExpression(path.node.init)) {
           const importModuleId = parseImportCall(
+            moduleLogger,
             path.node.init,
             path.scope,
             chunkModuleParams,
@@ -431,7 +429,7 @@ export async function splitFusionChunk(
           graph?.addEdge(moduleId, importModuleId);
 
           if (moduleIsCommonJS) {
-            console.log("Rewriting import call as require");
+            moduleLogger.log("Rewriting import call as require");
 
             path.replaceWith(
               variableDeclarator(
@@ -446,7 +444,7 @@ export async function splitFusionChunk(
           }
 
           if (!isIdentifier(path.node.id)) {
-            console.warn(
+            moduleLogger.warn(
               "Non-identifier imports are not implemented, got:",
               path.node.id.type,
             );
@@ -456,7 +454,7 @@ export async function splitFusionChunk(
           const statementParent = path.getStatementParent();
 
           if (!statementParent) {
-            console.warn("No statement parent for import found");
+            moduleLogger.warn("No statement parent for import found");
             return;
           }
 
@@ -470,6 +468,7 @@ export async function splitFusionChunk(
         } else if (isMemberExpression(path.node.init)) {
           if (isCallExpression(path.node.init.object)) {
             const importModuleId = parseImportCall(
+              moduleLogger,
               path.node.init.object,
               path.scope,
               chunkModuleParams,
@@ -484,7 +483,7 @@ export async function splitFusionChunk(
             graph?.addEdge(moduleId, importModuleId);
 
             if (!isIdentifier(path.node.id)) {
-              console.warn(
+              moduleLogger.warn(
                 "Non-identifier imports are not implemented, got:",
                 path.node.id.type,
               );
@@ -492,7 +491,7 @@ export async function splitFusionChunk(
             }
 
             if (!isIdentifier(path.node.init.property)) {
-              console.warn(
+              moduleLogger.warn(
                 "Non-identifier import accessors are not implemented, got:",
                 path.node.init.property.type,
               );
@@ -502,7 +501,7 @@ export async function splitFusionChunk(
             const statementParent = path.getStatementParent();
 
             if (!statementParent) {
-              console.warn("No statement parent for import found");
+              moduleLogger.warn("No statement parent for import found");
               return;
             }
 
@@ -517,14 +516,18 @@ export async function splitFusionChunk(
         }
       },
       AssignmentExpression(path) {
-        const defaultExport = getDefaultExport(path, chunkModuleParams);
+        const defaultExport = getDefaultExport(
+          moduleLogger,
+          path,
+          chunkModuleParams,
+        );
 
         if (!defaultExport) {
           return;
         }
 
         if (moduleIsCommonJS || !esmDefaultExports) {
-          console.log("Rewriting default exports as CommonJS");
+          moduleLogger.log("Rewriting default exports as CommonJS");
 
           path.replaceWith(
             assignmentExpression(
@@ -537,7 +540,7 @@ export async function splitFusionChunk(
           return;
         }
 
-        console.log("Rewriting default exports");
+        moduleLogger.log("Rewriting default exports");
 
         if (isExpressionStatement(path.parent)) {
           path.parentPath.replaceWith(exportDefaultDeclaration(defaultExport));
@@ -545,7 +548,7 @@ export async function splitFusionChunk(
           const statementParent = path.getStatementParent();
 
           if (!statementParent) {
-            console.warn("No statement parent for default exports found");
+            moduleLogger.warn("No statement parent for default exports found");
             return;
           }
 
@@ -562,7 +565,7 @@ export async function splitFusionChunk(
       },
       ImportSpecifier(path) {
         if (!isIdentifier(path.node.imported)) {
-          console.warn(
+          moduleLogger.warn(
             "Non-identifier imports should be unreachable, got:",
             path.node.imported.type,
           );
@@ -580,7 +583,7 @@ export async function splitFusionChunk(
         }
 
         if (path.scope.hasBinding(renameTo)) {
-          console.warn(
+          moduleLogger.warn(
             "Cannot rename local to match import,",
             renameTo,
             "is already bound",
@@ -590,7 +593,7 @@ export async function splitFusionChunk(
 
         path.scope.rename(path.node.local.name, renameTo);
 
-        console.log(
+        moduleLogger.log(
           "Renamed local",
           path.node.local.name,
           "to match import:",
@@ -599,7 +602,7 @@ export async function splitFusionChunk(
       },
       ExportSpecifier(path) {
         if (!isIdentifier(path.node.exported)) {
-          console.warn(
+          moduleLogger.warn(
             "Non-identifier exports should be unreachable, got:",
             path.node.exported.type,
           );
@@ -617,7 +620,7 @@ export async function splitFusionChunk(
         }
 
         if (path.scope.hasBinding(renameTo)) {
-          console.warn(
+          moduleLogger.warn(
             "Cannot rename local to match export,",
             renameTo,
             "is already bound",
@@ -627,7 +630,7 @@ export async function splitFusionChunk(
 
         path.scope.rename(path.node.local.name, renameTo);
 
-        console.log(
+        moduleLogger.log(
           "Renamed local",
           path.node.local.name,
           "to match export:",
@@ -670,13 +673,7 @@ ${formattedModuleCode}`,
     }
   }
 
-  if (isInModuleGroup) {
-    console.groupEnd();
-  }
-
   await chunkModulesSrcFormattedPromise;
-
-  console.groupEnd();
 
   return { chunkId, chunkModules };
 }

@@ -1,5 +1,6 @@
 import type { GraphData } from "./graph";
 
+import consola from "consola";
 import { MultiDirectedGraph } from "graphology";
 
 import { splitFusionChunk } from "..";
@@ -23,7 +24,7 @@ for (const arg of process.argv.slice(2)) {
   });
 
   if (!chunk) {
-    console.warn("Invalid chunk:", arg);
+    consola.warn("Invalid chunk:", arg);
     continue;
   }
 
@@ -43,7 +44,7 @@ for (const arg of process.argv.slice(2)) {
 const undeclaredModules = importedModules.difference(declaredModules);
 
 if (undeclaredModules.size) {
-  console.warn(
+  consola.warn(
     "Some modules were imported but not declared, across all input files:",
     undeclaredModules,
   );
