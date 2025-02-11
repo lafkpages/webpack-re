@@ -4,19 +4,22 @@ import { MultiDirectedGraph } from "graphology";
 import { circular } from "graphology-layout";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 import render from "graphology-svg";
+import iwanthue from "iwanthue";
 
 export interface GraphData {
   graphData: ReturnType<MultiDirectedGraph["export"]>;
   chunkCount: number;
 }
 
+export function layoutGraph(graph: MultiDirectedGraph) {
+  circular.assign(graph);
+  forceAtlas2.assign(graph, 500);
+}
+
 export async function buildGraphPage(
   graph: MultiDirectedGraph,
   chunkCount: number,
 ) {
-  circular.assign(graph);
-  forceAtlas2.assign(graph, 500);
-
   const graphData = JSON.stringify({
     graphData: graph.export(),
     chunkCount,
@@ -52,7 +55,13 @@ export async function buildGraphPage(
   });
 }
 
-export async function buildGraphSvg(graph: MultiDirectedGraph) {
+export async function buildGraphSvg(
+  graph: MultiDirectedGraph,
+  chunkCount: number,
+) {
+  const chunks: Record<number, string> = {};
+  const chunksPalette = iwanthue(chunkCount);
+
   await new Promise<void>((resolve, reject) => {
     render(
       graph,
@@ -61,13 +70,34 @@ export async function buildGraphSvg(graph: MultiDirectedGraph) {
         nodes: {
           reducer(
             settings: unknown,
-            node: unknown,
+            node: string,
             attr: Attributes,
           ): Attributes {
-            return {
-              ...attr,
-              type: undefined,
-            };
+            attr.label = node;
+            delete attr.type;
+
+            const chunkId =
+              typeof attr.chunkId === "number" ? attr.chunkId : null;
+
+            if (chunkId !== null) {
+              if (!chunks[chunkId]) {
+                const color = chunksPalette.pop();
+
+                if (!color) {
+                  throw new Error("Palette exhausted");
+                }
+
+                chunks[chunkId] = color;
+              }
+
+              attr.color = chunks[chunkId];
+
+              attr.label += ` (${chunkId})`;
+            }
+
+            attr.size = Math.sqrt(graph.outDegree(node) + 1);
+
+            return attr;
           },
         },
       },
@@ -89,6 +119,8 @@ if (import.meta.main) {
 
   const graph = MultiDirectedGraph.from(graphData);
 
+  layoutGraph(graph);
+
   await buildGraphPage(graph, chunkCount);
-  await buildGraphSvg(graph);
+  await buildGraphSvg(graph, chunkCount);
 }

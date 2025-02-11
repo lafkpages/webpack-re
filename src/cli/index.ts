@@ -3,7 +3,7 @@ import type { GraphData } from "./graph";
 import { MultiDirectedGraph } from "graphology";
 
 import { splitFusionChunk } from "..";
-import { buildGraphPage, buildGraphSvg } from "./graph";
+import { buildGraphPage, buildGraphSvg, layoutGraph } from "./graph";
 
 if (!import.meta.main) {
   throw new Error("CLI should not be imported as a module");
@@ -55,5 +55,7 @@ const graphData = JSON.stringify({
 } satisfies GraphData);
 await Bun.write("re/modules/graph/data.json", graphData);
 
+layoutGraph(graph);
+
 await buildGraphPage(graph, chunkCount);
-await buildGraphSvg(graph);
+await buildGraphSvg(graph, chunkCount);
