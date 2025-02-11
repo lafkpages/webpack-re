@@ -1,6 +1,9 @@
+import type { Attributes } from "graphology-types";
+
 import { MultiDirectedGraph } from "graphology";
 import { circular } from "graphology-layout";
 import forceAtlas2 from "graphology-layout-forceatlas2";
+import render from "graphology-svg";
 
 export interface GraphData {
   graphData: ReturnType<MultiDirectedGraph["export"]>;
@@ -49,6 +52,36 @@ export async function buildGraphPage(
   });
 }
 
+export async function buildGraphSvg(graph: MultiDirectedGraph) {
+  await new Promise<void>((resolve, reject) => {
+    render(
+      graph,
+      "re/modules/graph/graph.svg",
+      {
+        nodes: {
+          reducer(
+            settings: unknown,
+            node: unknown,
+            attr: Attributes,
+          ): Attributes {
+            return {
+              ...attr,
+              type: undefined,
+            };
+          },
+        },
+      },
+      (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      },
+    );
+  });
+}
+
 if (import.meta.main) {
   const { graphData, chunkCount } = (await Bun.file(
     "re/modules/graph/data.json",
@@ -57,4 +90,5 @@ if (import.meta.main) {
   const graph = MultiDirectedGraph.from(graphData);
 
   await buildGraphPage(graph, chunkCount);
+  await buildGraphSvg(graph);
 }
