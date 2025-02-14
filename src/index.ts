@@ -29,6 +29,7 @@ import {
   isNumericLiteral,
   isObjectExpression,
   isObjectProperty,
+  isReturnStatement,
   isSequenceExpression,
   memberExpression,
   program,
@@ -309,8 +310,36 @@ export async function splitWebpackChunk(
                       continue;
                     }
 
+                    let exportedVar: string | null = null;
+
                     if (isBlockStatement(property.value.body)) {
-                      if (property.value.body.body.length) {
+                      if (property.value.body.body.length === 1) {
+                        if (!isReturnStatement(property.value.body.body[0])) {
+                          moduleLogger.warn(
+                            "Invalid export property value body:",
+                            property.value.body.body[0].type,
+                          );
+                          continue;
+                        }
+
+                        if (!property.value.body.body[0].argument) {
+                          // TODO: void export
+                          moduleLogger.warn("Void exports not implemented");
+                          continue;
+                        }
+
+                        if (
+                          !isIdentifier(property.value.body.body[0].argument)
+                        ) {
+                          moduleLogger.warn(
+                            "Invalid export property value body:",
+                            property.value.body.body[0].argument.type,
+                          );
+                          continue;
+                        }
+
+                        exportedVar = property.value.body.body[0].argument.name;
+                      } else if (property.value.body.body.length) {
                         moduleLogger.warn(
                           "Invalid export property value body:",
                           property.value.body.body.length,
@@ -321,6 +350,16 @@ export async function splitWebpackChunk(
                       // TODO: void export
                       moduleLogger.warn("Void exports not implemented");
                     } else if (isIdentifier(property.value.body)) {
+                      exportedVar = property.value.body.name;
+                    } else {
+                      moduleLogger.warn(
+                        "Invalid export property value body:",
+                        property.value.body.type,
+                      );
+                      continue;
+                    }
+
+                    if (exportedVar) {
                       const statementParent = path.getStatementParent();
 
                       if (!statementParent) {
@@ -330,7 +369,6 @@ export async function splitWebpackChunk(
                         continue;
                       }
 
-                      const exportedVar = property.value.body.name;
                       const exportAs = property.key.name;
 
                       moduleLogger.log(
@@ -354,12 +392,6 @@ export async function splitWebpackChunk(
                           ]),
                         );
                       }
-                    } else {
-                      moduleLogger.warn(
-                        "Invalid export property value body:",
-                        property.value.body.type,
-                      );
-                      continue;
                     }
                   }
 
