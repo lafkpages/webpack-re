@@ -1,5 +1,7 @@
 import type { GraphData } from "./graph";
 
+import { join } from "node:path";
+
 import consola from "consola";
 import { MultiDirectedGraph } from "graphology";
 
@@ -10,6 +12,12 @@ if (!import.meta.main) {
   throw new Error("CLI should not be imported as a module");
 }
 
+const outdir = process.argv[2];
+if (!outdir) {
+  throw new Error("Missing outdir argument");
+}
+const graphOutdir = join(outdir, "graph");
+
 const importedModules = new Set<number>();
 const declaredModules = new Set<number>();
 
@@ -17,10 +25,10 @@ const graph = new MultiDirectedGraph();
 
 let chunkCount = 0;
 
-for (const arg of process.argv.slice(2)) {
+for (const arg of process.argv.slice(3)) {
   const chunk = await splitWebpackChunk(await Bun.file(arg).text(), {
     graph,
-    write: "re/modules",
+    write: outdir,
   });
 
   if (!chunk) {
@@ -54,9 +62,9 @@ const graphData = JSON.stringify({
   graphData: graph.export(),
   chunkCount,
 } satisfies GraphData);
-await Bun.write("re/modules/graph/data.json", graphData);
+await Bun.write(join(graphOutdir, "data.json"), graphData);
 
 layoutGraph(graph);
 
-await buildGraphPage(graph, chunkCount);
-await buildGraphSvg(graph, chunkCount);
+await buildGraphPage(graph, chunkCount, graphOutdir);
+await buildGraphSvg(graph, chunkCount, graphOutdir);

@@ -1,5 +1,7 @@
 import type { Attributes } from "graphology-types";
 
+import { join } from "node:path";
+
 import { MultiDirectedGraph } from "graphology";
 import { circular } from "graphology-layout";
 import forceAtlas2 from "graphology-layout-forceatlas2";
@@ -19,6 +21,7 @@ export function layoutGraph(graph: MultiDirectedGraph) {
 export async function buildGraphPage(
   graph: MultiDirectedGraph,
   chunkCount: number,
+  outdir: string,
 ) {
   const graphData = JSON.stringify({
     graphData: graph.export(),
@@ -27,7 +30,7 @@ export async function buildGraphPage(
 
   return await Bun.build({
     entrypoints: ["./src/cli/graph.html"],
-    outdir: "re/modules/graph",
+    outdir,
     minify: true,
     plugins: [
       {
@@ -58,6 +61,7 @@ export async function buildGraphPage(
 export async function buildGraphSvg(
   graph: MultiDirectedGraph,
   chunkCount: number,
+  outdir: string,
 ) {
   const chunks: Record<number, string> = {};
   const chunksPalette = iwanthue(chunkCount);
@@ -65,7 +69,7 @@ export async function buildGraphSvg(
   await new Promise<void>((resolve, reject) => {
     render(
       graph,
-      "re/modules/graph/graph.svg",
+      join(outdir, "graph.svg"),
       {
         nodes: {
           reducer(
@@ -113,14 +117,20 @@ export async function buildGraphSvg(
 }
 
 if (import.meta.main) {
+  const outdir = process.argv[2];
+
+  if (!outdir) {
+    throw new Error("Missing outdir argument");
+  }
+
   const { graphData, chunkCount } = (await Bun.file(
-    "re/modules/graph/data.json",
+    join(outdir, "data.json"),
   ).json()) as GraphData;
 
   const graph = MultiDirectedGraph.from(graphData);
 
   layoutGraph(graph);
 
-  await buildGraphPage(graph, chunkCount);
-  await buildGraphSvg(graph, chunkCount);
+  await buildGraphPage(graph, chunkCount, outdir);
+  await buildGraphSvg(graph, chunkCount, outdir);
 }
