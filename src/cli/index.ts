@@ -3,7 +3,7 @@ import type { GraphData } from "./graph";
 import consola from "consola";
 import { MultiDirectedGraph } from "graphology";
 
-import { splitFusionChunk } from "..";
+import { splitWebpackChunk } from "..";
 import { buildGraphPage, buildGraphSvg, layoutGraph } from "./graph";
 
 if (!import.meta.main) {
@@ -18,7 +18,7 @@ const graph = new MultiDirectedGraph();
 let chunkCount = 0;
 
 for (const arg of process.argv.slice(2)) {
-  const chunk = await splitFusionChunk(await Bun.file(arg).text(), {
+  const chunk = await splitWebpackChunk(await Bun.file(arg).text(), {
     graph,
     write: "re/modules",
   });

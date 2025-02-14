@@ -42,12 +42,12 @@ import reserved from "reserved";
 import prettierConfig from "../.prettierrc.json";
 import { getDefaultExport, parseImportCall } from "./ast";
 
-export interface FusionChunk {
+export interface WebpackChunk {
   chunkId: number;
-  chunkModules: Record<number, FusionChunkModule>;
+  chunkModules: Record<number, WebpackChunkModule>;
 }
 
-export interface FusionChunkModule {
+export interface WebpackChunkModule {
   id: number;
 
   file: File;
@@ -57,8 +57,8 @@ export interface FusionChunkModule {
   importedModules: number[];
 }
 
-export async function splitFusionChunk(
-  fusionChunkSrc: string,
+export async function splitWebpackChunk(
+  webpackChunkSrc: string,
   {
     esmDefaultExports = true,
     graph,
@@ -70,8 +70,8 @@ export async function splitFusionChunk(
 
     write: false | string;
   },
-): Promise<FusionChunk | null> {
-  const m = fusionChunkSrc.match(
+): Promise<WebpackChunk | null> {
+  const m = webpackChunkSrc.match(
     /^(?:(["'])use strict\1;)?(\((self\.webpackChunkFusion)=\3\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);\s*$/s,
   );
 
@@ -120,7 +120,7 @@ export async function splitFusionChunk(
     return null;
   }
 
-  const chunkModules: Record<number, FusionChunkModule> = {};
+  const chunkModules: Record<number, WebpackChunkModule> = {};
 
   let chunkModuleParams: string[] = [];
 
@@ -665,7 +665,7 @@ export async function splitFusionChunk(
         filename!,
         `\
 /*
- * Fusion chunk ${chunkId}, ${moduleIsCommonJS ? "CJS" : "ESM"} module ${moduleId}
+ * Webpack chunk ${chunkId}, ${moduleIsCommonJS ? "CJS" : "ESM"} module ${moduleId}
  */
 
 ${formattedModuleCode}`,

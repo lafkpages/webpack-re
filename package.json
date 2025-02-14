@@ -1,5 +1,5 @@
 {
-  "name": "fusionjs-re",
+  "name": "webpack-re",
   "module": "src/index.ts",
   "type": "module",
   "devDependencies": {
