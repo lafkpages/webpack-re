@@ -23,6 +23,7 @@ import {
   isBlockStatement,
   isCallExpression,
   isExpressionStatement,
+  isFunctionExpression,
   isIdentifier,
   isMemberExpression,
   isNumericLiteral,
@@ -160,7 +161,10 @@ export async function splitWebpackChunk(
 
     graph?.mergeNode(moduleId, { chunkId });
 
-    if (!isArrowFunctionExpression(property.value)) {
+    if (
+      !isFunctionExpression(property.value) &&
+      !isArrowFunctionExpression(property.value)
+    ) {
       moduleLogger.warn("Invalid chunk module value:", property.value.type);
       continue;
     }
@@ -286,7 +290,10 @@ export async function splitWebpackChunk(
                       continue;
                     }
 
-                    if (!isArrowFunctionExpression(property.value)) {
+                    if (
+                      !isFunctionExpression(property.value) &&
+                      !isArrowFunctionExpression(property.value)
+                    ) {
                       moduleLogger.warn(
                         "Invalid export property value:",
                         property.value.type,
