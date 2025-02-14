@@ -72,7 +72,7 @@ export async function splitWebpackChunk(
   },
 ): Promise<WebpackChunk | null> {
   const m = webpackChunkSrc.match(
-    /^(?:(["'])use strict\1;)?(\((self\.webpackChunkFusion)=\3\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);\s*$/s,
+    /(\((self\.webpackChunk(\w*))=\2\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);/s,
   );
 
   if (!m) {
