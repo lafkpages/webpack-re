@@ -792,11 +792,13 @@ export async function splitWebpackChunk(
     };
 
     if (write) {
+      const rawModuleId = property.key.value.toString();
+
       await Bun.write(
         filename!,
         `\
 /*
- * Webpack chunk ${chunkId}, ${moduleIsCommonJS ? "CJS" : "ESM"} module ${moduleId}
+ * Webpack chunk ${chunkId}, ${moduleIsCommonJS ? "CJS" : "ESM"} module ${moduleId}${moduleId !== rawModuleId ? ` (originally ${rawModuleId})` : ""}
  */
 
 ${formattedModuleCode}`,
