@@ -72,6 +72,31 @@ program
           transformation.renameVariables![parseInt(variableId)] = renameTo;
         }
 
+        for (const m of rawTransformation.matchAll(
+          /^#\s*([`'"])?(\w+)\1\s*?$/gm,
+        )) {
+          const [, quote, renameTo] = m;
+
+          if (quote !== "`") {
+            consola.warn(
+              "Module transformation for",
+              moduleId,
+              "has wrong or missing quote in header",
+            );
+          }
+
+          if (transformation.renameModule) {
+            consola.warn(
+              "Module transformation for",
+              moduleId,
+              "has multiple module rename headers",
+            );
+            break;
+          }
+
+          transformation.renameModule = renameTo;
+        }
+
         moduleTransformations[moduleId] = transformation;
 
         consola.info("Loaded module transformation:", moduleId);
