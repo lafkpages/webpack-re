@@ -184,7 +184,8 @@ export async function splitWebpackChunk(
       continue;
     }
 
-    const moduleId = resolveModule(property.key.value, moduleTransformations);
+    const rawModuleId = property.key.value.toString();
+    const moduleId = resolveModule(rawModuleId, moduleTransformations);
 
     const moduleLogger = chunkLogger.withTag(`module-${moduleId}`);
 
@@ -748,7 +749,9 @@ export async function splitWebpackChunk(
             moduleVariables.set(path.node, variableId);
 
             let renameTo =
-              moduleTransformations?.[moduleId]?.renameVariables?.[variableId];
+              moduleTransformations?.[rawModuleId]?.renameVariables?.[
+                variableId
+              ];
 
             if (renameTo) {
               if (reserved.includes(renameTo)) {
@@ -792,8 +795,6 @@ export async function splitWebpackChunk(
     };
 
     if (write) {
-      const rawModuleId = property.key.value.toString();
-
       await Bun.write(
         filename!,
         `\
