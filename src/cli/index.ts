@@ -1,7 +1,7 @@
 import type { GraphData } from "./graph";
 
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { program } from "@commander-js/extra-typings";
 import consola from "consola";
@@ -17,14 +17,12 @@ program
   .command("unbundle")
   .argument("<outdir>", "Output directory")
   .argument("<files...>", "Webpack chunk files")
-  .option("-g, --graph", "Build graph data")
+  .option("-g, --graph <outdir>", "Build graph data")
   .option("--rm", "Remove the output directory before writing")
   .action(async (outdir: string, files: string[], options) => {
     if (options.rm) {
       await rm(outdir, { recursive: true, force: true });
     }
-
-    const graphOutdir = join(outdir, "graph");
 
     const importedModules = new Set<number>();
     const declaredModules = new Set<number>();
@@ -66,7 +64,9 @@ program
       );
     }
 
-    if (graph) {
+    if (graph && options.graph) {
+      const graphOutdir = resolve(options.graph);
+
       const graphData = JSON.stringify({
         graphData: graph.export(),
         chunkCount,
