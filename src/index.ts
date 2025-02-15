@@ -73,7 +73,7 @@ export async function splitWebpackChunk(
     includeVariableDeclarationComments?: boolean;
     includeVariableReferenceComments?: boolean;
 
-    graph?: Graph;
+    graph?: Graph | null;
 
     write: false | string;
   },
