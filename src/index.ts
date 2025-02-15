@@ -1,4 +1,4 @@
-import type { File } from "@babel/types";
+import type { File, Identifier } from "@babel/types";
 import type Graph from "graphology";
 
 import { join } from "node:path";
@@ -63,10 +63,15 @@ export async function splitWebpackChunk(
   webpackChunkSrc: string,
   {
     esmDefaultExports = true,
+    includeVariableDeclarationComments,
+    includeVariableReferenceComments,
     graph,
     write,
   }: {
     esmDefaultExports?: boolean;
+
+    includeVariableDeclarationComments?: boolean;
+    includeVariableReferenceComments?: boolean;
 
     graph?: Graph;
 
@@ -677,6 +682,36 @@ export async function splitWebpackChunk(
         );
       },
     });
+
+    const moduleVariables = new WeakMap<Identifier, number>();
+    let moduleVariableCount = 0;
+
+    if (
+      includeVariableDeclarationComments ||
+      includeVariableReferenceComments
+    ) {
+      traverse(moduleFile, {
+        Identifier(path) {
+          const binding = path.scope.getBinding(path.node.name);
+
+          if (!binding) {
+            return;
+          }
+
+          if (binding.identifier === path.node) {
+            // This is the declaration
+            if (includeVariableDeclarationComments) {
+              path.addComment("leading", `Variable dec ${moduleVariableCount}`);
+            }
+            moduleVariables.set(path.node, moduleVariableCount++);
+          } else if (includeVariableReferenceComments) {
+            // This is a reference
+            const variableId = moduleVariables.get(binding.identifier);
+            path.addComment("leading", `Variable ref ${variableId}`);
+          }
+        },
+      });
+    }
 
     const filename = write ? join(write, `${moduleId}.js`) : undefined;
 
