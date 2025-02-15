@@ -727,7 +727,8 @@ export async function splitWebpackChunk(
 
     if (
       includeVariableDeclarationComments ||
-      includeVariableReferenceComments
+      includeVariableReferenceComments ||
+      moduleTransformations?.[rawModuleId]?.renameVariables // TODO: what if renameVariables is empty?
     ) {
       traverse(moduleFile, {
         Identifier(path) {
