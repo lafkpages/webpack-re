@@ -730,6 +730,9 @@ export async function splitWebpackChunk(
       includeVariableReferenceComments ||
       moduleTransformations?.[rawModuleId]?.renameVariables // TODO: what if renameVariables is empty?
     ) {
+      const moduleTransformationsLogger =
+        moduleLogger.withTag("transformations");
+
       traverse(moduleFile, {
         Identifier(path) {
           const binding = path.scope.getBinding(path.node.name);
@@ -759,11 +762,22 @@ export async function splitWebpackChunk(
                 renameTo = `_${renameTo}`;
               }
 
-              path.scope.rename(path.node.name, renameTo);
+              if (path.scope.hasBinding(renameTo)) {
+                moduleTransformationsLogger.warn(
+                  "Cannot rename variable",
+                  path.node.name,
+                  "to",
+                  renameTo,
+                  "as it is already bound",
+                );
+                return;
+              }
 
-              consola.log(
+              moduleTransformationsLogger.log(
                 `Renamed variable ${path.node.name} to ${renameTo} in module ${moduleId}`,
               );
+
+              path.scope.rename(path.node.name, renameTo);
             }
 
             moduleVariableCount++;
