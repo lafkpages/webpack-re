@@ -35,6 +35,8 @@ program
   )
 
   .action(async (outdir: string, files: string[], options) => {
+    outdir = resolve(outdir);
+
     if (options.rm) {
       await rm(outdir, { recursive: true, force: true });
     }
