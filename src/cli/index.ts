@@ -1,3 +1,7 @@
+import type {
+  ModuleTransformations,
+  WebpackChunkModuleTransformations,
+} from "..";
 import type { GraphData } from "./graph";
 
 import { rm } from "node:fs/promises";
@@ -25,6 +29,11 @@ program
   .option("--include-variable-declaration-comments")
   .option("--include-variable-reference-comments")
 
+  .option(
+    "-t, --module-transformations <dir>",
+    "Directory containing module transformations, with each file named after the module ID",
+  )
+
   .action(async (outdir: string, files: string[], options) => {
     if (options.rm) {
       await rm(outdir, { recursive: true, force: true });
@@ -35,6 +44,40 @@ program
 
     const graph = options.graph ? new MultiDirectedGraph() : null;
 
+    const moduleTransformations: WebpackChunkModuleTransformations = {};
+    if (options.moduleTransformations) {
+      const glob = new Bun.Glob("*.md");
+
+      for await (const file of glob.scan({
+        cwd: options.moduleTransformations,
+        absolute: true,
+      })) {
+        const moduleId = file.match(/(\d+)\.md$/)?.[1];
+
+        if (!moduleId) {
+          consola.warn("Invalid module transformation file:", file);
+          continue;
+        }
+
+        const rawTransformation = await Bun.file(file).text();
+        const transformation: ModuleTransformations = {
+          renameVariables: {},
+        };
+
+        for (const m of rawTransformation.matchAll(
+          /^\s*[-*]\s*([`'"])(\d)\1\s*:\s*\1(\w+)\1\s*?$/gm,
+        )) {
+          const [, , variableId, renameTo] = m;
+
+          transformation.renameVariables![parseInt(variableId)] = renameTo;
+        }
+
+        moduleTransformations[moduleId] = transformation;
+
+        consola.info("Loaded module transformation:", moduleId);
+      }
+    }
+
     let chunkCount = 0;
 
     for (const file of files) {
@@ -44,6 +87,8 @@ program
           options.includeVariableDeclarationComments,
         includeVariableReferenceComments:
           options.includeVariableReferenceComments,
+
+        moduleTransformations,
 
         graph,
         write: outdir,

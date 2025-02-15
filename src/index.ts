@@ -57,11 +57,13 @@ export interface WebpackChunkModule {
   importedModules: string[];
 }
 
-interface WebpackChunkModuleTransformations {
-  [moduleId: string]: {
-    renameModule?: string;
-    renameVariables?: Record<number, string>;
-  };
+export interface ModuleTransformations {
+  renameModule?: string;
+  renameVariables?: Record<number, string>;
+}
+
+export interface WebpackChunkModuleTransformations {
+  [moduleId: string]: ModuleTransformations;
 }
 
 function resolveModule(
