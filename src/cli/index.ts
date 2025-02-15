@@ -19,6 +19,12 @@ program
   .argument("<files...>", "Webpack chunk files")
   .option("-g, --graph <outdir>", "Build graph data")
   .option("--rm", "Remove the output directory before writing")
+
+  // Unbundle options
+  .option("--esm-default-exports", "Use ESM default exports", true)
+  .option("--include-variable-declaration-comments")
+  .option("--include-variable-reference-comments")
+
   .action(async (outdir: string, files: string[], options) => {
     if (options.rm) {
       await rm(outdir, { recursive: true, force: true });
@@ -33,6 +39,12 @@ program
 
     for (const file of files) {
       const chunk = await splitWebpackChunk(await Bun.file(file).text(), {
+        esmDefaultExports: options.esmDefaultExports,
+        includeVariableDeclarationComments:
+          options.includeVariableDeclarationComments,
+        includeVariableReferenceComments:
+          options.includeVariableReferenceComments,
+
         graph,
         write: outdir,
       });
