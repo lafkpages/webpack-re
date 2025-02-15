@@ -15,7 +15,23 @@ import { splitWebpackChunk } from "..";
 import { version } from "../../package.json";
 import { buildGraphPage, buildGraphSvg, layoutGraph } from "./graph";
 
-program.name("webpack-re").version(version);
+consola.wrapConsole();
+
+program
+  .name("webpack-re")
+  .version(version)
+  .configureOutput({
+    writeErr(str) {
+      str = str.replace(/^ *\[?error\]?:? *|\n$/g, "");
+
+      if (str.includes("\n")) {
+        process.stderr.write(str);
+      } else {
+        consola.error(str);
+      }
+    },
+    writeOut: consola.log,
+  });
 
 program
   .command("unbundle")
