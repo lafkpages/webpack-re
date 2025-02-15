@@ -137,6 +137,8 @@ program
       }
     }
 
+    consola.success("Unbundled", chunkCount, "chunks to:", outdir);
+
     const undeclaredModules = importedModules.difference(declaredModules);
 
     if (undeclaredModules.size) {
@@ -159,6 +161,8 @@ program
 
       await buildGraphPage(graph, chunkCount, graphOutdir);
       await buildGraphSvg(graph, chunkCount, graphOutdir);
+
+      consola.success("Graph data written to:", graphOutdir);
     }
   });
 

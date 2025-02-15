@@ -254,11 +254,13 @@ export async function splitWebpackChunk(
         }
 
         if (moduleHasDefaultExport) {
-          moduleLogger.log("Multiple default exports found, assuming CommonJS");
+          moduleLogger.info(
+            "Multiple default exports found, assuming CommonJS",
+          );
           moduleIsCommonJS = true;
           path.stop();
         } else if (isObjectExpression(defaultExport)) {
-          moduleLogger.log("Default export is an object, assuming CommonJS");
+          moduleLogger.info("Default export is an object, assuming CommonJS");
           moduleIsCommonJS = true;
           path.stop();
         }
@@ -399,9 +401,9 @@ export async function splitWebpackChunk(
 
                       const exportAs = property.key.name;
 
-                      moduleLogger.log(
+                      moduleLogger.info(
                         "Rewriting export",
-                        exportedVar.padEnd(5),
+                        exportedVar,
                         "as",
                         exportAs,
                       );
@@ -463,7 +465,7 @@ export async function splitWebpackChunk(
           }
 
           if (useRequire) {
-            moduleLogger.log("Rewriting import call as require");
+            moduleLogger.info("Rewriting import call as require");
 
             path.replaceWith(
               callExpression(identifier("require"), [
@@ -474,7 +476,7 @@ export async function splitWebpackChunk(
             return;
           }
 
-          moduleLogger.log("Rewriting import call");
+          moduleLogger.info("Rewriting import call");
 
           path.replaceWith(
             awaitExpression(
@@ -506,7 +508,7 @@ export async function splitWebpackChunk(
           graph?.addEdge(moduleId, importModuleId);
 
           if (moduleIsCommonJS) {
-            moduleLogger.log("Rewriting import call as require");
+            moduleLogger.info("Rewriting import call as require");
 
             path.replaceWith(
               variableDeclarator(
@@ -609,7 +611,7 @@ export async function splitWebpackChunk(
         }
 
         if (moduleIsCommonJS || !esmDefaultExports) {
-          moduleLogger.log("Rewriting default exports as CommonJS");
+          moduleLogger.info("Rewriting default exports as CommonJS");
 
           path.replaceWith(
             assignmentExpression(
@@ -622,7 +624,7 @@ export async function splitWebpackChunk(
           return;
         }
 
-        moduleLogger.log("Rewriting default exports");
+        moduleLogger.info("Rewriting default exports");
 
         if (isExpressionStatement(path.parent)) {
           path.parentPath.replaceWith(exportDefaultDeclaration(defaultExport));

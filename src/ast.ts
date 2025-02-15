@@ -125,7 +125,7 @@ export function rename(
   if (reason) {
     msg += `, ${reason}`;
   }
-  moduleLogger.log(msg);
+  moduleLogger.info(msg);
 
   return true;
 }
