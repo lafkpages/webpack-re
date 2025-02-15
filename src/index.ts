@@ -50,13 +50,31 @@ export interface WebpackChunk {
 }
 
 export interface WebpackChunkModule {
-  id: number;
-
   file: File;
   source: string;
 
   isCommonJS: boolean;
-  importedModules: number[];
+  importedModules: string[];
+}
+
+interface WebpackChunkModuleTransformations {
+  [moduleId: string]: {
+    renameModule?: string;
+    renameVariables?: Record<number, string>;
+  };
+}
+
+function resolveModule(
+  moduleId: string | number,
+  moduleTransformations?: WebpackChunkModuleTransformations,
+) {
+  const moduleTransformation = moduleTransformations?.[moduleId];
+
+  if (moduleTransformation?.renameModule) {
+    return moduleTransformation.renameModule;
+  }
+
+  return moduleId.toString();
 }
 
 export async function splitWebpackChunk(
@@ -65,6 +83,7 @@ export async function splitWebpackChunk(
     esmDefaultExports = true,
     includeVariableDeclarationComments,
     includeVariableReferenceComments,
+    moduleTransformations,
     graph,
     write,
   }: {
@@ -72,6 +91,8 @@ export async function splitWebpackChunk(
 
     includeVariableDeclarationComments?: boolean;
     includeVariableReferenceComments?: boolean;
+
+    moduleTransformations?: WebpackChunkModuleTransformations;
 
     graph?: Graph | null;
 
@@ -127,7 +148,7 @@ export async function splitWebpackChunk(
     return null;
   }
 
-  const chunkModules: Record<number, WebpackChunkModule> = {};
+  const chunkModules: Record<number | string, WebpackChunkModule> = {};
 
   let chunkModuleParams: string[] = [];
 
@@ -161,7 +182,7 @@ export async function splitWebpackChunk(
       continue;
     }
 
-    const moduleId = property.key.value;
+    const moduleId = resolveModule(property.key.value, moduleTransformations);
 
     const moduleLogger = chunkLogger.withTag(`module-${moduleId}`);
 
@@ -213,7 +234,7 @@ export async function splitWebpackChunk(
 
     const moduleFile = file(program(moduleFunction.body.body));
 
-    const importedModules: number[] = [];
+    const importedModules: string[] = [];
 
     let moduleIsCommonJS = false;
     let moduleHasDefaultExport = false;
@@ -406,16 +427,21 @@ export async function splitWebpackChunk(
             }
           }
         } else {
-          const importModuleId = parseImportCall(
+          const importRawModuleId = parseImportCall(
             moduleLogger,
             path.node,
             path.scope,
             chunkModuleParams,
           );
 
-          if (importModuleId === null) {
+          if (importRawModuleId === null) {
             return;
           }
+
+          const importModuleId = resolveModule(
+            importRawModuleId,
+            moduleTransformations,
+          );
 
           importedModules.push(importModuleId);
           graph?.mergeNode(importModuleId);
@@ -457,16 +483,21 @@ export async function splitWebpackChunk(
       },
       VariableDeclarator(path) {
         if (isCallExpression(path.node.init)) {
-          const importModuleId = parseImportCall(
+          const importRawModuleId = parseImportCall(
             moduleLogger,
             path.node.init,
             path.scope,
             chunkModuleParams,
           );
 
-          if (importModuleId === null) {
+          if (importRawModuleId === null) {
             return;
           }
+
+          const importModuleId = resolveModule(
+            importRawModuleId,
+            moduleTransformations,
+          );
 
           importedModules.push(importModuleId);
           graph?.mergeNode(importModuleId);
@@ -511,16 +542,21 @@ export async function splitWebpackChunk(
           path.remove();
         } else if (isMemberExpression(path.node.init)) {
           if (isCallExpression(path.node.init.object)) {
-            const importModuleId = parseImportCall(
+            const importRawModuleId = parseImportCall(
               moduleLogger,
               path.node.init.object,
               path.scope,
               chunkModuleParams,
             );
 
-            if (importModuleId === null) {
+            if (importRawModuleId === null) {
               return;
             }
+
+            const importModuleId = resolveModule(
+              importRawModuleId,
+              moduleTransformations,
+            );
 
             importedModules.push(importModuleId);
             graph?.mergeNode(importModuleId);
@@ -700,10 +736,31 @@ export async function splitWebpackChunk(
 
           if (binding.identifier === path.node) {
             // This is the declaration
+
+            const variableId = moduleVariableCount;
+
             if (includeVariableDeclarationComments) {
-              path.addComment("leading", `Variable dec ${moduleVariableCount}`);
+              path.addComment("leading", `Variable dec ${variableId}`);
             }
-            moduleVariables.set(path.node, moduleVariableCount++);
+
+            moduleVariables.set(path.node, variableId);
+
+            let renameTo =
+              moduleTransformations?.[moduleId]?.renameVariables?.[variableId];
+
+            if (renameTo) {
+              if (reserved.includes(renameTo)) {
+                renameTo = `_${renameTo}`;
+              }
+
+              path.scope.rename(path.node.name, renameTo);
+
+              consola.log(
+                `Renamed variable ${path.node.name} to ${renameTo} in module ${moduleId}`,
+              );
+            }
+
+            moduleVariableCount++;
           } else if (includeVariableReferenceComments) {
             // This is a reference
             const variableId = moduleVariables.get(binding.identifier);
@@ -725,8 +782,6 @@ export async function splitWebpackChunk(
     });
 
     chunkModules[moduleId] = {
-      id: moduleId,
-
       file: moduleFile,
       source: formattedModuleCode,
 

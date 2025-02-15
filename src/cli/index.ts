@@ -30,8 +30,8 @@ program
       await rm(outdir, { recursive: true, force: true });
     }
 
-    const importedModules = new Set<number>();
-    const declaredModules = new Set<number>();
+    const importedModules = new Set<string>();
+    const declaredModules = new Set<string>();
 
     const graph = options.graph ? new MultiDirectedGraph() : null;
 
@@ -63,7 +63,7 @@ program
           importedModules.add(importedModule);
         }
 
-        declaredModules.add(module.id);
+        declaredModules.add(moduleId);
       }
     }
 
