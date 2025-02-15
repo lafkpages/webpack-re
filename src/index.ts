@@ -39,10 +39,9 @@ import {
 } from "@babel/types";
 import consola from "consola";
 import { format } from "prettier";
-import reserved from "reserved";
 
 import prettierConfig from "../.prettierrc.json";
-import { getDefaultExport, parseImportCall } from "./ast";
+import { getDefaultExport, parseImportCall, rename } from "./ast";
 
 export interface WebpackChunk {
   chunkId: number;
@@ -655,33 +654,7 @@ export async function splitWebpackChunk(
           return;
         }
 
-        if (path.node.local.name === path.node.imported.name) {
-          return;
-        }
-
-        let renameTo = path.node.imported.name;
-
-        if (reserved.includes(renameTo)) {
-          renameTo = `_${renameTo}`;
-        }
-
-        if (path.scope.hasBinding(renameTo)) {
-          moduleLogger.warn(
-            "Cannot rename local to match import,",
-            renameTo,
-            "is already bound",
-          );
-          return;
-        }
-
-        path.scope.rename(path.node.local.name, renameTo);
-
-        moduleLogger.log(
-          "Renamed local",
-          path.node.local.name,
-          "to match import:",
-          renameTo,
-        );
+        rename(moduleLogger, path, path.node.imported.name, "to match import");
       },
       ExportSpecifier(path) {
         if (!isIdentifier(path.node.exported)) {
@@ -692,33 +665,7 @@ export async function splitWebpackChunk(
           return;
         }
 
-        if (path.node.local.name === path.node.exported.name) {
-          return;
-        }
-
-        let renameTo = path.node.exported.name;
-
-        if (reserved.includes(renameTo)) {
-          renameTo = `_${renameTo}`;
-        }
-
-        if (path.scope.hasBinding(renameTo)) {
-          moduleLogger.warn(
-            "Cannot rename local to match export,",
-            renameTo,
-            "is already bound",
-          );
-          return;
-        }
-
-        path.scope.rename(path.node.local.name, renameTo);
-
-        moduleLogger.log(
-          "Renamed local",
-          path.node.local.name,
-          "to match export:",
-          renameTo,
-        );
+        rename(moduleLogger, path, path.node.exported.name, "to match export");
       },
     });
 
@@ -730,9 +677,6 @@ export async function splitWebpackChunk(
       includeVariableReferenceComments ||
       moduleTransformations?.[rawModuleId]?.renameVariables // TODO: what if renameVariables is empty?
     ) {
-      const moduleTransformationsLogger =
-        moduleLogger.withTag("transformations");
-
       traverse(moduleFile, {
         Identifier(path) {
           const binding = path.scope.getBinding(path.node.name);
@@ -752,33 +696,14 @@ export async function splitWebpackChunk(
 
             moduleVariables.set(path.node, variableId);
 
-            let renameTo =
+            rename(
+              moduleLogger,
+              path,
               moduleTransformations?.[rawModuleId]?.renameVariables?.[
                 variableId
-              ];
-
-            if (renameTo) {
-              if (reserved.includes(renameTo)) {
-                renameTo = `_${renameTo}`;
-              }
-
-              if (path.scope.hasBinding(renameTo)) {
-                moduleTransformationsLogger.warn(
-                  "Cannot rename variable",
-                  path.node.name,
-                  "to",
-                  renameTo,
-                  "as it is already bound",
-                );
-                return;
-              }
-
-              moduleTransformationsLogger.log(
-                `Renamed variable ${path.node.name} to ${renameTo} in module ${moduleId}`,
-              );
-
-              path.scope.rename(path.node.name, renameTo);
-            }
+              ],
+              "due to module transformation",
+            );
 
             moduleVariableCount++;
           } else if (includeVariableReferenceComments) {

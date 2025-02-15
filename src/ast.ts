@@ -1,5 +1,11 @@
 import type { NodePath, Scope } from "@babel/traverse";
-import type { AssignmentExpression, CallExpression } from "@babel/types";
+import type {
+  AssignmentExpression,
+  CallExpression,
+  ExportSpecifier,
+  Identifier,
+  ImportSpecifier,
+} from "@babel/types";
 import type { ConsolaInstance } from "consola";
 
 import {
@@ -7,6 +13,7 @@ import {
   isMemberExpression,
   isNumericLiteral,
 } from "@babel/types";
+import reserved from "reserved";
 
 export function getDefaultExport(
   moduleLogger: ConsolaInstance,
@@ -73,4 +80,52 @@ export function parseImportCall(
   }
 
   return null;
+}
+
+export function rename(
+  moduleLogger: ConsolaInstance,
+  path: NodePath<Identifier | ImportSpecifier | ExportSpecifier>,
+  renameTo: string | null | undefined,
+  reason?: string,
+) {
+  if (!renameTo) {
+    return false;
+  }
+
+  if (reserved.includes(renameTo)) {
+    renameTo = `_${renameTo}`;
+  }
+
+  let originalName: string;
+  if (isIdentifier(path.node)) {
+    originalName = path.node.name;
+  } else {
+    originalName = path.node.local.name;
+  }
+
+  if (originalName === renameTo) {
+    return false;
+  }
+
+  if (path.scope.hasBinding(renameTo)) {
+    moduleLogger.warn(
+      "Cannot rename",
+      originalName,
+      "to",
+      renameTo,
+      "as it is already bound",
+      reason ? `(${reason})` : "",
+    );
+    return false;
+  }
+
+  path.scope.rename(originalName, renameTo);
+
+  let msg = `Renamed variable ${originalName} to ${renameTo}`;
+  if (reason) {
+    msg += `, ${reason}`;
+  }
+  moduleLogger.log(msg);
+
+  return true;
 }
