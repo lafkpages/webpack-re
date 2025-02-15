@@ -1,7 +1,4 @@
-import type {
-  ModuleTransformations,
-  WebpackChunkModuleTransformations,
-} from "..";
+import type { ChunkModulesTransformations, ModuleTransformations } from "..";
 import type { GraphData } from "./graph";
 
 import { rm } from "node:fs/promises";
@@ -34,13 +31,13 @@ program
   });
 
 program
-  .command("unbundle")
+  .command("split")
   .argument("<outdir>", "Output directory")
   .argument("<files...>", "Webpack chunk files")
   .option("-g, --graph <outdir>", "Build graph data")
   .option("--rm", "Remove the output directory before writing")
 
-  // Unbundle options
+  // Split options
   .option("--esm-default-exports", "Use ESM default exports", true)
   .option("--include-variable-declaration-comments")
   .option("--include-variable-reference-comments")
@@ -62,7 +59,7 @@ program
 
     const graph = options.graph ? new MultiDirectedGraph() : null;
 
-    const moduleTransformations: WebpackChunkModuleTransformations = {};
+    const moduleTransformations: ChunkModulesTransformations = {};
     if (options.moduleTransformations) {
       const glob = new Bun.Glob("*.md");
 
@@ -155,7 +152,7 @@ program
       }
     }
 
-    consola.success("Unbundled", chunkCount, "chunks to:", outdir);
+    consola.success("Split", chunkCount, "chunks to:", outdir);
 
     const undeclaredModules = importedModules.difference(declaredModules);
 

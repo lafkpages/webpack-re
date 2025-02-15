@@ -43,12 +43,12 @@ import { format } from "prettier";
 import prettierConfig from "../.prettierrc.json";
 import { getDefaultExport, parseImportCall, rename } from "./ast";
 
-export interface WebpackChunk {
+export interface Chunk {
   chunkId: number;
-  chunkModules: Record<number, WebpackChunkModule>;
+  chunkModules: Record<number, ChunkModule>;
 }
 
-export interface WebpackChunkModule {
+export interface ChunkModule {
   file: File;
   source: string;
 
@@ -61,13 +61,13 @@ export interface ModuleTransformations {
   renameVariables?: Record<number, string>;
 }
 
-export interface WebpackChunkModuleTransformations {
+export interface ChunkModulesTransformations {
   [moduleId: string]: ModuleTransformations;
 }
 
 function resolveModule(
   moduleId: string | number,
-  moduleTransformations?: WebpackChunkModuleTransformations,
+  moduleTransformations?: ChunkModulesTransformations,
 ) {
   const moduleTransformation = moduleTransformations?.[moduleId];
 
@@ -79,7 +79,7 @@ function resolveModule(
 }
 
 export async function splitWebpackChunk(
-  webpackChunkSrc: string,
+  chunkSrc: string,
   {
     esmDefaultExports = true,
     includeVariableDeclarationComments,
@@ -93,14 +93,14 @@ export async function splitWebpackChunk(
     includeVariableDeclarationComments?: boolean;
     includeVariableReferenceComments?: boolean;
 
-    moduleTransformations?: WebpackChunkModuleTransformations;
+    moduleTransformations?: ChunkModulesTransformations;
 
     graph?: Graph | null;
 
     write: false | string;
   },
-): Promise<WebpackChunk | null> {
-  const m = webpackChunkSrc.match(
+): Promise<Chunk | null> {
+  const m = chunkSrc.match(
     /(\((self\.webpackChunk(\w*))=\2\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);/s,
   );
 
@@ -149,7 +149,7 @@ export async function splitWebpackChunk(
     return null;
   }
 
-  const chunkModules: Record<number | string, WebpackChunkModule> = {};
+  const chunkModules: Record<number | string, ChunkModule> = {};
 
   let chunkModuleParams: string[] = [];
 
