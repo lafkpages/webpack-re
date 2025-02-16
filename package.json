@@ -14,6 +14,7 @@
     "@types/babel__generator": "^7.6.8",
     "@types/babel__traverse": "^7.20.6",
     "@types/bun": "latest",
+    "@types/react": "^19.0.9",
     "commander": "^13.1.0",
     "consola": "^3.4.0",
     "graphology": "^0.26.0",

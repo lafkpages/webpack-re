@@ -43,6 +43,7 @@ import { DirectedGraph } from "graphology";
 import { format } from "prettier";
 import reserved from "reserved";
 
+import prettierConfig from "../.prettierrc.json";
 import { getDefaultExport, parseImportCall, rename } from "./ast";
 
 export type ChunkGraph = DirectedGraph<{}, {}, {}>;
@@ -68,6 +69,8 @@ export interface Chunk {
 
 export interface ModuleTransformations {
   renameModule?: string;
+  importAsAbsolute?: boolean;
+
   renameVariables?: Record<number, string>;
 }
 
@@ -82,10 +85,15 @@ function resolveModule(
   const moduleTransformation = moduleTransformations?.[moduleId];
 
   if (moduleTransformation?.renameModule) {
-    return moduleTransformation.renameModule;
+    return [
+      moduleTransformation.renameModule,
+      moduleTransformation.importAsAbsolute
+        ? moduleTransformation.renameModule
+        : `./${moduleTransformation.renameModule}`,
+    ];
   }
 
-  return moduleId.toString();
+  return [moduleId.toString(), `./${moduleId}`];
 }
 
 export async function splitWebpackChunk(
@@ -185,7 +193,7 @@ export async function splitWebpackChunk(
       continue;
     }
 
-    const moduleId = resolveModule(rawModuleId, moduleTransformations);
+    const [moduleId] = resolveModule(rawModuleId, moduleTransformations);
 
     const moduleLogger = chunkLogger.withTag(moduleId);
 
@@ -253,7 +261,7 @@ export async function splitWebpackChunk(
           return;
         }
 
-        const importModuleId = resolveModule(
+        const [importModuleId] = resolveModule(
           importRawModuleId,
           moduleTransformations,
         );
@@ -273,7 +281,7 @@ export async function splitWebpackChunk(
             return;
           }
 
-          const importModuleId = resolveModule(
+          const [importModuleId] = resolveModule(
             importRawModuleId,
             moduleTransformations,
           );
@@ -292,7 +300,7 @@ export async function splitWebpackChunk(
               return;
             }
 
-            const importModuleId = resolveModule(
+            const [importModuleId] = resolveModule(
               importRawModuleId,
               moduleTransformations,
             );
@@ -518,7 +526,7 @@ export async function splitWebpackChunk(
             return;
           }
 
-          const importModuleId = resolveModule(
+          const [, importModulePath] = resolveModule(
             importRawModuleId,
             moduleTransformations,
           );
@@ -539,7 +547,7 @@ export async function splitWebpackChunk(
 
             path.replaceWith(
               callExpression(identifier("require"), [
-                stringLiteral(`./${importModuleId}`),
+                stringLiteral(importModulePath),
               ]),
             );
 
@@ -549,9 +557,7 @@ export async function splitWebpackChunk(
           moduleLogger.info("Rewriting import call");
 
           path.replaceWith(
-            awaitExpression(
-              importExpression(stringLiteral(`./${importModuleId}`)),
-            ),
+            awaitExpression(importExpression(stringLiteral(importModulePath))),
           );
         }
       },
@@ -568,7 +574,7 @@ export async function splitWebpackChunk(
             return;
           }
 
-          const importModuleId = resolveModule(
+          const [importModuleId, importModulePath] = resolveModule(
             importRawModuleId,
             moduleTransformations,
           );
@@ -580,7 +586,7 @@ export async function splitWebpackChunk(
               variableDeclarator(
                 path.node.id,
                 callExpression(identifier("require"), [
-                  stringLiteral(`./${importModuleId}`),
+                  stringLiteral(importModulePath),
                 ]),
               ),
             );
@@ -607,14 +613,14 @@ export async function splitWebpackChunk(
             statementParent.insertBefore(
               importDeclaration(
                 [importDefaultSpecifier(identifier(path.node.id.name))],
-                stringLiteral(`./${importModuleId}`),
+                stringLiteral(importModulePath),
               ),
             );
           } else {
             statementParent.insertBefore(
               importDeclaration(
                 [importNamespaceSpecifier(identifier(path.node.id.name))],
-                stringLiteral(`./${importModuleId}`),
+                stringLiteral(importModulePath),
               ),
             );
           }
@@ -633,7 +639,7 @@ export async function splitWebpackChunk(
               return;
             }
 
-            const importModuleId = resolveModule(
+            const [, importModulePath] = resolveModule(
               importRawModuleId,
               moduleTransformations,
             );
@@ -682,7 +688,7 @@ export async function splitWebpackChunk(
             statementParent.insertBefore(
               importDeclaration(
                 [importSpecifier(identifier(local), identifier(imported))],
-                stringLiteral(`./${importModuleId}`),
+                stringLiteral(importModulePath),
               ),
             );
             path.remove();
@@ -835,12 +841,12 @@ export async function splitWebpackChunk(
 
     const moduleCode = generate(moduleFile, { filename }).code;
 
-    const formattedModuleCode = /*await format(moduleCode, {
+    const formattedModuleCode = await format(moduleCode, {
       parser: "babel",
       filepath: filename,
 
       ...prettierConfig,
-    });*/ moduleCode;
+    });
 
     graph?.mergeNodeAttributes(moduleId, {
       file: moduleFile,

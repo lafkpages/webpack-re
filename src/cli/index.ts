@@ -98,9 +98,9 @@ program
         }
 
         for (const m of rawTransformation.matchAll(
-          /^#\s*([`'"])?(\w+)\1\s*?$/gm,
+          /^(#+)\s*([`'"])?(\w+)\2\s*?$/gm,
         )) {
-          const [, quote, renameTo] = m;
+          const [, header, quote, renameTo] = m;
 
           if (quote !== "`") {
             consola.warn(
@@ -108,6 +108,17 @@ program
               moduleId,
               "has wrong or missing quote in header",
             );
+          }
+
+          if (header === "##") {
+            transformation.importAsAbsolute = true;
+          } else if (header !== "#") {
+            consola.warn(
+              "Module transformation for",
+              moduleId,
+              "has wrong or missing header type",
+            );
+            break;
           }
 
           if (transformation.renameModule) {
