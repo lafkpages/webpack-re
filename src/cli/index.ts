@@ -1,4 +1,8 @@
-import type { ChunkModulesTransformations, ModuleTransformations } from "..";
+import type {
+  ChunkGraph,
+  ChunkModulesTransformations,
+  ModuleTransformations,
+} from "..";
 import type { GraphData } from "./graph";
 
 import { rm } from "node:fs/promises";
@@ -6,7 +10,7 @@ import { join, resolve } from "node:path";
 
 import { program } from "@commander-js/extra-typings";
 import consola from "consola";
-import { MultiDirectedGraph } from "graphology";
+import { DirectedGraph } from "graphology";
 
 import { splitWebpackChunk } from "..";
 import { version } from "../../package.json";
@@ -54,10 +58,10 @@ program
       await rm(outdir, { recursive: true, force: true });
     }
 
-    const importedModules = new Set<string>();
-    const declaredModules = new Set<string>();
+    // const importedModules = new Set<string>();
+    // const declaredModules = new Set<string>();
 
-    const graph = options.graph ? new MultiDirectedGraph() : null;
+    const graph: ChunkGraph = new DirectedGraph();
 
     const moduleTransformations: ChunkModulesTransformations = {};
     if (options.moduleTransformations) {
@@ -121,47 +125,49 @@ program
     let chunkCount = 0;
 
     for (const file of files) {
-      const chunk = await splitWebpackChunk(await Bun.file(file).text(), {
-        esmDefaultExports: options.esmDefaultExports,
-        includeVariableDeclarationComments:
-          options.includeVariableDeclarationComments,
-        includeVariableReferenceComments:
-          options.includeVariableReferenceComments,
+      const chunkModules = await splitWebpackChunk(
+        await Bun.file(file).text(),
+        {
+          esmDefaultExports: options.esmDefaultExports,
+          includeVariableDeclarationComments:
+            options.includeVariableDeclarationComments,
+          includeVariableReferenceComments:
+            options.includeVariableReferenceComments,
 
-        moduleTransformations,
+          moduleTransformations,
 
-        graph,
-        write: outdir,
-      });
+          write: outdir,
+        },
+      );
 
-      if (!chunk) {
+      if (!chunkModules) {
         consola.warn("Invalid chunk:", file);
         continue;
       }
 
       chunkCount++;
 
-      for (const moduleId in chunk.chunkModules) {
-        const module = chunk.chunkModules[moduleId];
+      // for (const moduleId in chunkModules) {
+      //   const module = chunkModules[moduleId];
 
-        for (const importedModule of module.importedModules) {
-          importedModules.add(importedModule);
-        }
+      //   for (const importedModule of module.importedModules) {
+      //     importedModules.add(importedModule);
+      //   }
 
-        declaredModules.add(moduleId);
-      }
+      //   declaredModules.add(moduleId);
+      // }
     }
 
     consola.success("Split", chunkCount, "chunks to:", outdir);
 
-    const undeclaredModules = importedModules.difference(declaredModules);
+    // const undeclaredModules = importedModules.difference(declaredModules);
 
-    if (undeclaredModules.size) {
-      consola.warn(
-        "Some modules were imported but not declared, across all input files:",
-        undeclaredModules,
-      );
-    }
+    // if (undeclaredModules.size) {
+    //   consola.warn(
+    //     "Some modules were imported but not declared, across all input files:",
+    //     undeclaredModules,
+    //   );
+    // }
 
     if (graph && options.graph) {
       const graphOutdir = resolve(options.graph);

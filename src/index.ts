@@ -1,5 +1,4 @@
 import type { File, Identifier } from "@babel/types";
-import type Graph from "graphology";
 
 import { join } from "node:path";
 
@@ -16,6 +15,7 @@ import {
   file,
   identifier,
   importDeclaration,
+  importDefaultSpecifier,
   importExpression,
   importNamespaceSpecifier,
   importSpecifier,
@@ -38,22 +38,27 @@ import {
   variableDeclarator,
 } from "@babel/types";
 import consola from "consola";
+import { DirectedGraph } from "graphology";
 import { format } from "prettier";
 
 import prettierConfig from "../.prettierrc.json";
 import { getDefaultExport, parseImportCall, rename } from "./ast";
 
-export interface Chunk {
-  chunkId: number;
-  chunkModules: Record<number, ChunkModule>;
-}
+export type ChunkGraph = DirectedGraph<{}, {}, {}>;
 
 export interface ChunkModule {
   file: File;
   source: string;
 
+  chunkId: number;
+  rawModuleId: string;
+
   isCommonJS: boolean;
-  importedModules: string[];
+  hasDefaultExport: boolean;
+}
+
+export interface ChunkModules {
+  [moduleId: string]: ChunkModule;
 }
 
 export interface ModuleTransformations {
@@ -95,11 +100,11 @@ export async function splitWebpackChunk(
 
     moduleTransformations?: ChunkModulesTransformations;
 
-    graph?: Graph | null;
+    graph?: ChunkGraph | null;
 
     write: false | string;
   },
-): Promise<Chunk | null> {
+): Promise<ChunkModules | null> {
   const m = chunkSrc.match(
     /(\((self\.webpackChunk(\w*))=\2\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);/s,
   );
@@ -122,6 +127,8 @@ export async function splitWebpackChunk(
         filepath: chunkModulesFilename!,
       }).then(async (chunkModulesSrcFormatted) => {
         await Bun.write(chunkModulesFilename!, chunkModulesSrcFormatted);
+
+        consola.success("Chunk pretty printed and written");
       })
     : null;
 
@@ -149,9 +156,9 @@ export async function splitWebpackChunk(
     return null;
   }
 
-  const chunkModules: Record<number | string, ChunkModule> = {};
-
   let chunkModuleParams: string[] = [];
+
+  const chunkModules: ChunkModules = {};
 
   chunkModulesLoop: for (const property of rootObjectExpression.properties) {
     if (!isObjectProperty(property)) {
@@ -187,8 +194,6 @@ export async function splitWebpackChunk(
     const moduleId = resolveModule(rawModuleId, moduleTransformations);
 
     const moduleLogger = chunkLogger.withTag(`module-${moduleId}`);
-
-    graph?.mergeNode(moduleId, { chunkId });
 
     if (
       !isFunctionExpression(property.value) &&
@@ -236,12 +241,72 @@ export async function splitWebpackChunk(
 
     const moduleFile = file(program(moduleFunction.body.body));
 
-    const importedModules: string[] = [];
+    let isCommonJS = false;
+    let hasDefaultExport = false;
 
-    let moduleIsCommonJS = false;
-    let moduleHasDefaultExport = false;
+    moduleLogger.debug("Running initial import and export scan traversal");
 
     traverse(moduleFile, {
+      CallExpression(path) {
+        const importRawModuleId = parseImportCall(
+          moduleLogger,
+          path.node,
+          path.scope,
+          chunkModuleParams,
+        );
+
+        if (importRawModuleId === null) {
+          return;
+        }
+
+        const importModuleId = resolveModule(
+          importRawModuleId,
+          moduleTransformations,
+        );
+
+        graph?.mergeEdge(moduleId, importModuleId);
+      },
+      VariableDeclarator(path) {
+        if (isCallExpression(path.node.init)) {
+          const importRawModuleId = parseImportCall(
+            moduleLogger,
+            path.node.init,
+            path.scope,
+            chunkModuleParams,
+          );
+
+          if (importRawModuleId === null) {
+            return;
+          }
+
+          const importModuleId = resolveModule(
+            importRawModuleId,
+            moduleTransformations,
+          );
+
+          graph?.mergeEdge(moduleId, importModuleId);
+        } else if (isMemberExpression(path.node.init)) {
+          if (isCallExpression(path.node.init.object)) {
+            const importRawModuleId = parseImportCall(
+              moduleLogger,
+              path.node.init.object,
+              path.scope,
+              chunkModuleParams,
+            );
+
+            if (importRawModuleId === null) {
+              return;
+            }
+
+            const importModuleId = resolveModule(
+              importRawModuleId,
+              moduleTransformations,
+            );
+
+            graph?.mergeEdge(moduleId, importModuleId);
+          }
+        }
+      },
       AssignmentExpression(path) {
         const defaultExport = getDefaultExport(
           moduleLogger,
@@ -253,25 +318,41 @@ export async function splitWebpackChunk(
           return;
         }
 
-        if (moduleHasDefaultExport) {
+        if (hasDefaultExport) {
           moduleLogger.info(
             "Multiple default exports found, assuming CommonJS",
           );
-          moduleIsCommonJS = true;
-          path.stop();
+          isCommonJS = true;
         } else if (isObjectExpression(defaultExport)) {
           moduleLogger.info("Default export is an object, assuming CommonJS");
-          moduleIsCommonJS = true;
-          path.stop();
+          isCommonJS = true;
         }
 
-        moduleHasDefaultExport = true;
+        hasDefaultExport = true;
       },
     });
 
-    if (moduleIsCommonJS) {
-      graph?.mergeNode(moduleId, { type: "square" });
-    }
+    graph?.mergeNode(moduleId);
+
+    chunkModules[moduleId] = {
+      file: moduleFile,
+      source: "",
+
+      chunkId,
+      rawModuleId,
+
+      isCommonJS,
+      hasDefaultExport,
+    };
+  }
+
+  for (const [
+    moduleId,
+    { file: moduleFile, rawModuleId, isCommonJS: moduleIsCommonJS },
+  ] of Object.entries(chunkModules)) {
+    const moduleLogger = chunkLogger.withTag(`module-${moduleId}`);
+
+    consola.debug("Running module split traversal");
 
     traverse(moduleFile, {
       CallExpression(path) {
@@ -447,12 +528,6 @@ export async function splitWebpackChunk(
             moduleTransformations,
           );
 
-          importedModules.push(importModuleId);
-          graph?.mergeNode(importModuleId);
-          graph?.addEdge(moduleId, importModuleId);
-
-          // TODO: check if await is allowed in scope
-
           let useRequire = moduleIsCommonJS;
 
           if (!moduleIsCommonJS) {
@@ -503,10 +578,6 @@ export async function splitWebpackChunk(
             moduleTransformations,
           );
 
-          importedModules.push(importModuleId);
-          graph?.mergeNode(importModuleId);
-          graph?.addEdge(moduleId, importModuleId);
-
           if (moduleIsCommonJS) {
             moduleLogger.info("Rewriting import call as require");
 
@@ -537,12 +608,22 @@ export async function splitWebpackChunk(
             return;
           }
 
-          statementParent.insertBefore(
-            importDeclaration(
-              [importNamespaceSpecifier(identifier(path.node.id.name))],
-              stringLiteral(`./${importModuleId}`),
-            ),
-          );
+          if (chunkModules[importModuleId]?.hasDefaultExport) {
+            statementParent.insertBefore(
+              importDeclaration(
+                [importDefaultSpecifier(identifier(path.node.id.name))],
+                stringLiteral(`./${importModuleId}`),
+              ),
+            );
+          } else {
+            statementParent.insertBefore(
+              importDeclaration(
+                [importNamespaceSpecifier(identifier(path.node.id.name))],
+                stringLiteral(`./${importModuleId}`),
+              ),
+            );
+          }
+
           path.remove();
         } else if (isMemberExpression(path.node.init)) {
           if (isCallExpression(path.node.init.object)) {
@@ -561,10 +642,6 @@ export async function splitWebpackChunk(
               importRawModuleId,
               moduleTransformations,
             );
-
-            importedModules.push(importModuleId);
-            graph?.mergeNode(importModuleId);
-            graph?.addEdge(moduleId, importModuleId);
 
             if (!isIdentifier(path.node.id)) {
               moduleLogger.warn(
@@ -679,6 +756,8 @@ export async function splitWebpackChunk(
       includeVariableReferenceComments ||
       moduleTransformations?.[rawModuleId]?.renameVariables // TODO: what if renameVariables is empty?
     ) {
+      consola.debug("Running module transformation traversal");
+
       traverse(moduleFile, {
         Identifier(path) {
           const binding = path.scope.getBinding(path.node.name);
@@ -728,13 +807,10 @@ export async function splitWebpackChunk(
       ...prettierConfig,
     });
 
-    chunkModules[moduleId] = {
+    graph?.mergeNodeAttributes(moduleId, {
       file: moduleFile,
       source: formattedModuleCode,
-
-      isCommonJS: moduleIsCommonJS,
-      importedModules,
-    };
+    });
 
     if (write) {
       await Bun.write(
@@ -751,5 +827,5 @@ ${formattedModuleCode}`,
 
   await chunkModulesSrcFormattedPromise;
 
-  return { chunkId, chunkModules };
+  return chunkModules;
 }
