@@ -1,19 +1,12 @@
 import type { NodePath, Scope } from "@babel/traverse";
-import type {
-  AssignmentExpression,
-  CallExpression,
-  ExportSpecifier,
-  Identifier,
-  ImportSpecifier,
-  VariableDeclarator,
-} from "@babel/types";
+import type { AssignmentExpression, CallExpression } from "@babel/types";
 import type { ConsolaInstance } from "consola";
 
 import {
   isIdentifier,
   isMemberExpression,
   isNumericLiteral,
-  isVariableDeclarator,
+  isStringLiteral,
 } from "@babel/types";
 import reserved from "reserved";
 
@@ -67,15 +60,17 @@ export function parseImportCall(
         return null;
       }
 
-      if (!isNumericLiteral(callExpression.arguments[0])) {
-        moduleLogger.warn(
-          "Invalid import argument:",
-          callExpression.arguments[0].type,
-        );
+      const importArgument = callExpression.arguments[0];
+
+      if (
+        !isNumericLiteral(importArgument) &&
+        !isStringLiteral(importArgument)
+      ) {
+        moduleLogger.warn("Invalid import argument:", importArgument.type);
         return null;
       }
 
-      const importModuleId = callExpression.arguments[0].value;
+      const importModuleId = importArgument.value.toString();
 
       return importModuleId;
     }
@@ -86,9 +81,8 @@ export function parseImportCall(
 
 export function rename(
   moduleLogger: ConsolaInstance,
-  path: NodePath<
-    Identifier | ImportSpecifier | ExportSpecifier | VariableDeclarator
-  >,
+  scope: Scope,
+  originalName: string,
   renameTo: string | null | undefined,
   reason?: string,
 ): string | null {
@@ -100,24 +94,11 @@ export function rename(
     renameTo = `_${renameTo}`;
   }
 
-  let originalName: string;
-  if (isIdentifier(path.node)) {
-    originalName = path.node.name;
-  } else if (isVariableDeclarator(path.node)) {
-    if (!isIdentifier(path.node.id)) {
-      throw new Error("Invalid variable declarator");
-    }
-
-    originalName = path.node.id.name;
-  } else {
-    originalName = path.node.local.name;
-  }
-
   if (originalName === renameTo) {
     return null;
   }
 
-  if (path.scope.hasBinding(renameTo)) {
+  if (scope.hasBinding(renameTo)) {
     moduleLogger.warn(
       "Cannot rename",
       originalName,
@@ -129,7 +110,7 @@ export function rename(
     return null;
   }
 
-  path.scope.rename(originalName, renameTo);
+  scope.rename(originalName, renameTo);
 
   let msg = `Renamed variable ${originalName} to ${renameTo}`;
   if (reason) {

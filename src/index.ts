@@ -31,6 +31,7 @@ import {
   isObjectProperty,
   isReturnStatement,
   isSequenceExpression,
+  isStringLiteral,
   memberExpression,
   program,
   stringLiteral,
@@ -40,8 +41,8 @@ import {
 import consola from "consola";
 import { DirectedGraph } from "graphology";
 import { format } from "prettier";
+import reserved from "reserved";
 
-import prettierConfig from "../.prettierrc.json";
 import { getDefaultExport, parseImportCall, rename } from "./ast";
 
 export type ChunkGraph = DirectedGraph<{}, {}, {}>;
@@ -50,7 +51,6 @@ export interface ChunkModule {
   file: File;
   source: string;
 
-  chunkId: number;
   rawModuleId: string;
 
   isCommonJS: boolean;
@@ -59,6 +59,11 @@ export interface ChunkModule {
 
 export interface ChunkModules {
   [moduleId: string]: ChunkModule;
+}
+
+export interface Chunk {
+  id: number;
+  modules: ChunkModules;
 }
 
 export interface ModuleTransformations {
@@ -104,7 +109,7 @@ export async function splitWebpackChunk(
 
     write: false | string;
   },
-): Promise<ChunkModules | null> {
+): Promise<Chunk | null> {
   const m = chunkSrc.match(
     /(\((self\.webpackChunk(\w*))=\2\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);/s,
   );
@@ -116,21 +121,22 @@ export async function splitWebpackChunk(
   const chunkId = parseInt(m[4]);
   const chunkModulesSrc = `(${m[5]}, 0)`;
 
-  const chunkLogger = consola.withTag(`chunk-${chunkId}`);
+  const chunkLogger = consola.withTag(chunkId.toString());
 
   const chunkModulesFilename = write
     ? join(write, `chunk-${chunkId}.js`)
     : null;
-  const chunkModulesSrcFormattedPromise = write
-    ? format(chunkModulesSrc, {
-        parser: "babel",
-        filepath: chunkModulesFilename!,
-      }).then(async (chunkModulesSrcFormatted) => {
-        await Bun.write(chunkModulesFilename!, chunkModulesSrcFormatted);
 
-        chunkLogger.success("Chunk pretty printed and written");
-      })
-    : null;
+  if (write) {
+    const chunkModulesSrcFormatted = await format(chunkModulesSrc, {
+      parser: "babel",
+      filepath: chunkModulesFilename!,
+    });
+
+    await Bun.write(chunkModulesFilename!, chunkModulesSrcFormatted);
+
+    chunkLogger.success("Chunk pretty printed and written");
+  }
 
   const ast = parse(chunkModulesSrc);
 
@@ -169,31 +175,19 @@ export async function splitWebpackChunk(
       continue;
     }
 
-    if (!isNumericLiteral(property.key)) {
-      if (isIdentifier(property.key)) {
-        const fusionModuleMatch = property.key.name.match(/^__fusion__(\d+)$/);
-
-        if (fusionModuleMatch) {
-          const fusionModuleId = parseInt(fusionModuleMatch[1]);
-
-          const moduleLogger = chunkLogger.withTag(
-            `fusion-module-${fusionModuleId}`,
-          );
-
-          // TODO
-          moduleLogger.warn(`Fusion modules not implemented`);
-          continue;
-        }
-      }
-
+    let rawModuleId: string;
+    if (isNumericLiteral(property.key) || isStringLiteral(property.key)) {
+      rawModuleId = property.key.value.toString();
+    } else if (isIdentifier(property.key)) {
+      rawModuleId = property.key.name;
+    } else {
       chunkLogger.warn("Invalid chunk module key:", property.key.type);
       continue;
     }
 
-    const rawModuleId = property.key.value.toString();
     const moduleId = resolveModule(rawModuleId, moduleTransformations);
 
-    const moduleLogger = chunkLogger.withTag(`module-${moduleId}`);
+    const moduleLogger = chunkLogger.withTag(moduleId);
 
     if (
       !isFunctionExpression(property.value) &&
@@ -338,7 +332,6 @@ export async function splitWebpackChunk(
       file: moduleFile,
       source: "",
 
-      chunkId,
       rawModuleId,
 
       isCommonJS,
@@ -350,9 +343,11 @@ export async function splitWebpackChunk(
     moduleId,
     { file: moduleFile, rawModuleId, isCommonJS: moduleIsCommonJS },
   ] of Object.entries(chunkModules)) {
-    const moduleLogger = chunkLogger.withTag(`module-${moduleId}`);
+    const moduleLogger = chunkLogger.withTag(moduleId);
 
-    consola.debug("Running module split traversal");
+    moduleLogger.debug("Running module split traversal");
+
+    const importsToRename = new Map<string, string>();
 
     traverse(moduleFile, {
       CallExpression(path) {
@@ -669,15 +664,19 @@ export async function splitWebpackChunk(
             let local = path.node.id.name;
             const imported = path.node.init.property.name;
 
-            const renameResult = rename(
-              moduleLogger,
-              path,
-              imported,
-              "to match import",
-            );
+            if (
+              !reserved.includes(imported) &&
+              !path.scope.hasBinding(imported)
+            ) {
+              moduleLogger.info(
+                "Renamed local",
+                local,
+                "to match imported name",
+                imported,
+              );
 
-            if (renameResult) {
-              local = renameResult;
+              importsToRename.set(local, imported);
+              local = imported;
             }
 
             statementParent.insertBefore(
@@ -738,6 +737,15 @@ export async function splitWebpackChunk(
           path.replaceWith(exportsId);
         }
       },
+      Identifier(path) {
+        const renameTo = importsToRename.get(path.node.name);
+
+        if (renameTo && !path.scope.hasBinding(path.node.name)) {
+          // For some reason, Scope.rename() doesn't work for imports,
+          // so this is a workaround to rename locals to match imports
+          path.node.name = renameTo;
+        }
+      },
       ExportSpecifier(path) {
         if (!isIdentifier(path.node.exported)) {
           moduleLogger.warn(
@@ -747,7 +755,13 @@ export async function splitWebpackChunk(
           return;
         }
 
-        rename(moduleLogger, path, path.node.exported.name, "to match export");
+        rename(
+          moduleLogger,
+          path.scope,
+          path.node.local.name,
+          path.node.exported.name,
+          "to match export",
+        );
       },
     });
 
@@ -757,9 +771,14 @@ export async function splitWebpackChunk(
     if (
       includeVariableDeclarationComments ||
       includeVariableReferenceComments ||
-      moduleTransformations?.[rawModuleId]?.renameVariables // TODO: what if renameVariables is empty?
+      (moduleTransformations?.[rawModuleId]?.renameVariables &&
+        Object.getOwnPropertyNames(
+          moduleTransformations?.[rawModuleId]?.renameVariables,
+        ).length)
+      // getOwnPropertyNames is the fastest way to check if an object is empty in Bun:
+      // https://discord.com/channels/876711213126520882/1111136889743888455/1260408373086785608
     ) {
-      consola.debug("Running module transformation traversal");
+      moduleLogger.debug("Running module transformation traversal");
 
       traverse(moduleFile, {
         Identifier(path) {
@@ -782,7 +801,8 @@ export async function splitWebpackChunk(
 
             rename(
               moduleLogger,
-              path,
+              path.scope,
+              path.node.name,
               moduleTransformations?.[rawModuleId]?.renameVariables?.[
                 variableId
               ],
@@ -803,12 +823,12 @@ export async function splitWebpackChunk(
 
     const moduleCode = generate(moduleFile, { filename }).code;
 
-    const formattedModuleCode = await format(moduleCode, {
+    const formattedModuleCode = /*await format(moduleCode, {
       parser: "babel",
       filepath: filename,
 
       ...prettierConfig,
-    });
+    });*/ moduleCode;
 
     graph?.mergeNodeAttributes(moduleId, {
       file: moduleFile,
@@ -828,7 +848,10 @@ ${formattedModuleCode}`,
     }
   }
 
-  await chunkModulesSrcFormattedPromise;
+  chunkLogger.success("Chunk split completed");
 
-  return chunkModules;
+  return {
+    id: chunkId,
+    modules: chunkModules,
+  };
 }
