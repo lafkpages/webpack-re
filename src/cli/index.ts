@@ -17,6 +17,7 @@ import { version } from "../../package.json";
 import { buildGraphPage, buildGraphSvg, layoutGraph } from "./graph";
 
 consola.wrapConsole();
+consola.options.throttle = 0;
 
 program
   .name("webpack-re")
@@ -85,15 +86,14 @@ program
         }
 
         const rawTransformation = await Bun.file(file).text();
-        const transformation: ModuleTransformations = {
-          renameVariables: {},
-        };
+        const transformation: ModuleTransformations = {};
 
         for (const m of rawTransformation.matchAll(
           /^\s*[-*]\s*([`'"])(\d)\1\s*:\s*\1(\w+)\1\s*?$/gm,
         )) {
           const [, , variableId, renameTo] = m;
 
+          transformation.renameVariables ??= {};
           transformation.renameVariables![parseInt(variableId)] = renameTo;
         }
 
