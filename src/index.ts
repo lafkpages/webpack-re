@@ -738,12 +738,24 @@ export async function splitWebpackChunk(
         }
       },
       Identifier(path) {
-        const renameTo = importsToRename.get(path.node.name);
+        const renameImportTo = importsToRename.get(path.node.name);
 
-        if (renameTo && !path.scope.hasBinding(path.node.name)) {
-          // For some reason, Scope.rename() doesn't work for imports,
-          // so this is a workaround to rename locals to match imports
-          path.node.name = renameTo;
+        if (!path.scope.hasBinding(path.node.name)) {
+          if (renameImportTo) {
+            // For some reason, Scope.rename() doesn't work for imports,
+            // so this is a workaround to rename locals to match imports
+            path.node.name = renameImportTo;
+          } else if (path.node.name === chunkModuleParams[1]) {
+            path.node.name = "exports";
+          }
+
+          // else {
+          //   const chunkModuleParam = chunkModuleParams.indexOf(path.node.name);
+
+          //   if (chunkModuleParam !== -1) {
+          //     path.node.name = chunkModuleParamsNames[chunkModuleParam];
+          //   }
+          // }
         }
       },
       ExportSpecifier(path) {
