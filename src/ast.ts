@@ -5,6 +5,7 @@ import type {
   ExportSpecifier,
   Identifier,
   ImportSpecifier,
+  VariableDeclarator,
 } from "@babel/types";
 import type { ConsolaInstance } from "consola";
 
@@ -12,6 +13,7 @@ import {
   isIdentifier,
   isMemberExpression,
   isNumericLiteral,
+  isVariableDeclarator,
 } from "@babel/types";
 import reserved from "reserved";
 
@@ -84,12 +86,14 @@ export function parseImportCall(
 
 export function rename(
   moduleLogger: ConsolaInstance,
-  path: NodePath<Identifier | ImportSpecifier | ExportSpecifier>,
+  path: NodePath<
+    Identifier | ImportSpecifier | ExportSpecifier | VariableDeclarator
+  >,
   renameTo: string | null | undefined,
   reason?: string,
-) {
+): string | null {
   if (!renameTo) {
-    return false;
+    return null;
   }
 
   if (reserved.includes(renameTo)) {
@@ -99,12 +103,18 @@ export function rename(
   let originalName: string;
   if (isIdentifier(path.node)) {
     originalName = path.node.name;
+  } else if (isVariableDeclarator(path.node)) {
+    if (!isIdentifier(path.node.id)) {
+      throw new Error("Invalid variable declarator");
+    }
+
+    originalName = path.node.id.name;
   } else {
     originalName = path.node.local.name;
   }
 
   if (originalName === renameTo) {
-    return false;
+    return null;
   }
 
   if (path.scope.hasBinding(renameTo)) {
@@ -116,7 +126,7 @@ export function rename(
       "as it is already bound",
       reason ? `(${reason})` : "",
     );
-    return false;
+    return null;
   }
 
   path.scope.rename(originalName, renameTo);
@@ -127,5 +137,5 @@ export function rename(
   }
   moduleLogger.info(msg);
 
-  return true;
+  return renameTo;
 }

@@ -128,7 +128,7 @@ export async function splitWebpackChunk(
       }).then(async (chunkModulesSrcFormatted) => {
         await Bun.write(chunkModulesFilename!, chunkModulesSrcFormatted);
 
-        consola.success("Chunk pretty printed and written");
+        chunkLogger.success("Chunk pretty printed and written");
       })
     : null;
 
@@ -666,9 +666,23 @@ export async function splitWebpackChunk(
               return;
             }
 
+            let local = path.node.id.name;
+            const imported = path.node.init.property.name;
+
+            const renameResult = rename(
+              moduleLogger,
+              path,
+              imported,
+              "to match import",
+            );
+
+            if (renameResult) {
+              local = renameResult;
+            }
+
             statementParent.insertBefore(
               importDeclaration(
-                [importSpecifier(path.node.id, path.node.init.property)],
+                [importSpecifier(identifier(local), identifier(imported))],
                 stringLiteral(`./${importModuleId}`),
               ),
             );
@@ -723,17 +737,6 @@ export async function splitWebpackChunk(
 
           path.replaceWith(exportsId);
         }
-      },
-      ImportSpecifier(path) {
-        if (!isIdentifier(path.node.imported)) {
-          moduleLogger.warn(
-            "Non-identifier imports should be unreachable, got:",
-            path.node.imported.type,
-          );
-          return;
-        }
-
-        rename(moduleLogger, path, path.node.imported.name, "to match import");
       },
       ExportSpecifier(path) {
         if (!isIdentifier(path.node.exported)) {
