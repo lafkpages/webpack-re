@@ -103,6 +103,7 @@ export async function splitWebpackChunk(
     includeVariableDeclarationComments,
     includeVariableReferenceComments,
     moduleTransformations,
+    excludeAbsoluteModules = true,
     graph,
     write,
   }: {
@@ -112,6 +113,7 @@ export async function splitWebpackChunk(
     includeVariableReferenceComments?: boolean;
 
     moduleTransformations?: ChunkModulesTransformations;
+    excludeAbsoluteModules?: boolean;
 
     graph?: ChunkGraph | null;
 
@@ -352,6 +354,14 @@ export async function splitWebpackChunk(
     { file: moduleFile, rawModuleId, isCommonJS: moduleIsCommonJS },
   ] of Object.entries(chunkModules)) {
     const moduleLogger = chunkLogger.withTag(moduleId);
+
+    if (
+      excludeAbsoluteModules &&
+      moduleTransformations?.[rawModuleId]?.importAsAbsolute
+    ) {
+      moduleLogger.debug("Excluding absolute module");
+      continue;
+    }
 
     moduleLogger.debug("Running module split traversal");
 
@@ -846,11 +856,9 @@ export async function splitWebpackChunk(
       filepath: filename,
 
       ...prettierConfig,
-    });
-
-    graph?.mergeNodeAttributes(moduleId, {
-      file: moduleFile,
-      source: formattedModuleCode,
+    }).catch((error) => {
+      moduleLogger.error("Prettier error:", error);
+      return moduleCode;
     });
 
     if (write) {
@@ -863,6 +871,14 @@ export async function splitWebpackChunk(
 
 ${formattedModuleCode}`,
       );
+    }
+  }
+
+  if (excludeAbsoluteModules && moduleTransformations) {
+    for (const [moduleId, { rawModuleId }] of Object.entries(chunkModules)) {
+      if (moduleTransformations[rawModuleId]?.importAsAbsolute) {
+        delete chunkModules[moduleId];
+      }
     }
   }
 

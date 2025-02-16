@@ -57,6 +57,11 @@ program
     "-t, --module-transformations <dir>",
     "Directory containing module transformations, with each file named after the module ID",
   )
+  .option(
+    "--exclude-absolute-modules",
+    "Exclude modules that are marked as absolute imports in module transformations",
+    true,
+  )
 
   .action(async (outdir: string, files: string[], options) => {
     outdir = resolve(outdir);
@@ -152,6 +157,7 @@ program
             options.includeVariableReferenceComments,
 
           moduleTransformations,
+          excludeAbsoluteModules: options.excludeAbsoluteModules,
 
           write: outdir,
         },
