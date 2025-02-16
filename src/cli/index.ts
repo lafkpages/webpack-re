@@ -9,7 +9,7 @@ import { rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { program } from "@commander-js/extra-typings";
-import consola from "consola";
+import consola, { LogLevels } from "consola";
 import { DirectedGraph } from "graphology";
 
 import { splitWebpackChunk } from "..";
@@ -32,6 +32,12 @@ program
       }
     },
     writeOut: consola.log,
+  })
+  .option("-v, --verbose", "Enable verbose logging", false)
+  .hook("preAction", (a, b) => {
+    if (a.opts().verbose) {
+      consola.level = LogLevels.debug;
+    }
   });
 
 program
