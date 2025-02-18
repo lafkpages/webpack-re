@@ -65,7 +65,7 @@ program
     true,
   )
 
-  .action(async (outdir: string, files: string[], options) => {
+  .action(async (outdir, files, options) => {
     outdir = resolve(outdir);
 
     if (options.rm) {
