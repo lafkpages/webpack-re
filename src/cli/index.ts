@@ -49,7 +49,7 @@ program
   .option("--rm", "Remove the output directory before writing")
 
   // Split options
-  .option("--esm-default-exports", "Use ESM default exports", true)
+  .option("--no-esm-default-exports", "Do not use ESM default exports", true)
   .option("--include-variable-declaration-comments")
   .option("--include-variable-reference-comments")
 
@@ -58,8 +58,8 @@ program
     "Directory containing module transformations, with each file named after the module ID",
   )
   .option(
-    "--exclude-absolute-modules",
-    "Exclude modules that are marked as absolute imports in module transformations",
+    "--no-exclude-absolute-modules",
+    "Do not exclude modules that are marked as absolute imports in module transformations",
     true,
   )
 
