@@ -35,8 +35,10 @@ program
     writeOut: consola.log,
   })
   .option("-v, --verbose", "Enable verbose logging", false)
-  .hook("preAction", (a, b) => {
-    if (a.opts().verbose) {
+  .hook("preAction", (thisCommand) => {
+    const globalOpts = thisCommand.opts();
+
+    if (globalOpts.verbose) {
       consola.level = LogLevels.debug;
     }
   });
@@ -75,7 +77,7 @@ program
 
     const graph: ChunkGraph = new DirectedGraph();
 
-    const moduleTransformations: ChunkModulesTransformations = {};
+    const modulesTransformations: ChunkModulesTransformations = {};
     if (options.moduleTransformations) {
       const glob = new Bun.Glob("*.md");
 
@@ -138,7 +140,7 @@ program
           transformation.renameModule = renameTo;
         }
 
-        moduleTransformations[moduleId] = transformation;
+        modulesTransformations[moduleId] = transformation;
 
         consola.info("Loaded module transformation:", moduleId);
       }
@@ -156,7 +158,7 @@ program
           includeVariableReferenceComments:
             options.includeVariableReferenceComments,
 
-          moduleTransformations,
+          modulesTransformations,
           excludeAbsoluteModules: options.excludeAbsoluteModules,
 
           write: outdir,
