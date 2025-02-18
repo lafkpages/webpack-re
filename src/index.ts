@@ -712,45 +712,87 @@ export async function splitWebpackChunk(
           chunkModuleParams,
         );
 
-        if (!defaultExport) {
-          return;
-        }
+        if (defaultExport) {
+          if (moduleIsCommonJS || !esmDefaultExports) {
+            moduleLogger.info("Rewriting default exports as CommonJS");
 
-        if (moduleIsCommonJS || !esmDefaultExports) {
-          moduleLogger.info("Rewriting default exports as CommonJS");
+            path.replaceWith(
+              assignmentExpression(
+                "=",
+                memberExpression(identifier("module"), identifier("exports")),
+                defaultExport,
+              ),
+            );
 
-          path.replaceWith(
-            assignmentExpression(
-              "=",
-              memberExpression(identifier("module"), identifier("exports")),
-              defaultExport,
-            ),
-          );
-
-          return;
-        }
-
-        moduleLogger.info("Rewriting default exports");
-
-        if (isExpressionStatement(path.parent)) {
-          path.parentPath.replaceWith(exportDefaultDeclaration(defaultExport));
-        } else {
-          const statementParent = path.getStatementParent();
-
-          if (!statementParent) {
-            moduleLogger.warn("No statement parent for default exports found");
             return;
           }
 
-          const exportsId = path.scope.generateUidIdentifier("exports");
+          moduleLogger.info("Rewriting default exports");
+
+          if (isExpressionStatement(path.parent)) {
+            path.parentPath.replaceWith(
+              exportDefaultDeclaration(defaultExport),
+            );
+          } else {
+            const statementParent = path.getStatementParent();
+
+            if (!statementParent) {
+              moduleLogger.warn(
+                "No statement parent for default exports found",
+              );
+              return;
+            }
+
+            const exportsId = path.scope.generateUidIdentifier("exports");
+            statementParent.insertBefore(
+              variableDeclaration("const", [
+                variableDeclarator(exportsId, defaultExport),
+              ]),
+            );
+            statementParent.insertBefore(exportDefaultDeclaration(exportsId));
+
+            path.replaceWith(exportsId);
+          }
+
+          return;
+        }
+
+        if (
+          !moduleIsCommonJS &&
+          isMemberExpression(path.node.left) &&
+          isIdentifier(path.node.left.object) &&
+          isIdentifier(path.node.left.property) &&
+          path.node.left.object.name === chunkModuleParams[1] &&
+          !path.scope.hasBinding(path.node.left.object.name)
+        ) {
+          if (!isIdentifier(path.node.right)) {
+            moduleLogger.warn(
+              "Non-identifier exports not supported, got:",
+              path.node.right.type,
+            );
+            return;
+          }
+
+          const local = path.node.right.name;
+          const exported = path.node.left.property.name;
+
+          moduleLogger.info("Rewriting export of", local);
+
+          const statementParent = path.getStatementParent();
+
+          if (!statementParent) {
+            moduleLogger.warn("No statement parent for export found");
+            return;
+          }
+
           statementParent.insertBefore(
-            variableDeclaration("const", [
-              variableDeclarator(exportsId, defaultExport),
+            exportNamedDeclaration(null, [
+              exportSpecifier(identifier(local), identifier(exported)),
             ]),
           );
-          statementParent.insertBefore(exportDefaultDeclaration(exportsId));
 
-          path.replaceWith(exportsId);
+          // TODO: check if return value is used
+          path.remove();
         }
       },
       Identifier(path) {
