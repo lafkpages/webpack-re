@@ -66,12 +66,6 @@ program
   )
 
   .action(async (outdir, files, options) => {
-    outdir = resolve(outdir);
-
-    if (options.rm) {
-      await rm(outdir, { recursive: true, force: true });
-    }
-
     // const importedModules = new Set<string>();
     // const declaredModules = new Set<string>();
 
@@ -144,6 +138,12 @@ program
 
         consola.info("Loaded module transformation:", moduleId);
       }
+    }
+
+    outdir = resolve(outdir);
+
+    if (options.rm) {
+      await rm(outdir, { recursive: true, force: true });
     }
 
     let chunkCount = 0;
