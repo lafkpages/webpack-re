@@ -792,7 +792,7 @@ export function applyModuleTransformations(
           const variableId = moduleVariableCount;
 
           if (includeVariableDeclarationComments) {
-            path.addComment("leading", `Variable dec ${variableId}`);
+            path.addComment("leading", `vd ${variableId}`);
           }
 
           moduleVariables.set(path.node, variableId);
@@ -809,7 +809,7 @@ export function applyModuleTransformations(
         } else if (includeVariableReferenceComments) {
           // This is a reference
           const variableId = moduleVariables.get(binding.identifier);
-          path.addComment("leading", `Variable ref ${variableId}`);
+          path.addComment("leading", `vr ${variableId}`);
         }
       },
     });
