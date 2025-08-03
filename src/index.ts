@@ -247,7 +247,7 @@ export async function splitWebpackChunk(
     traverseModule(
       moduleLogger,
       moduleFile,
-      modulesTransformations?.[rawModuleId],
+      modulesTransformations,
       moduleIsCommonJS,
       chunkModules,
       chunkModuleParams,

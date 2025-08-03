@@ -6,7 +6,12 @@ import type {
   Identifier,
 } from "@babel/types";
 import type { ConsolaInstance } from "consola";
-import type { ChunkGraph, ChunkModules, ModuleTransformations } from ".";
+import type {
+  ChunkGraph,
+  ChunkModules,
+  ChunkModulesTransformations,
+  ModuleTransformations,
+} from ".";
 
 import traverse from "@babel/traverse";
 import {
@@ -199,7 +204,7 @@ export function moduleScanTraversal(
   logger: ConsolaInstance,
   file: File,
   id: string,
-  moduleTransformations: ModuleTransformations | null | undefined,
+  modulesTransformations: ChunkModulesTransformations | null | undefined,
   graph: ChunkGraph | null | undefined,
   chunkModuleParams: string[],
 ) {
@@ -223,7 +228,7 @@ export function moduleScanTraversal(
 
       const [importModuleId] = resolveModule(
         importRawModuleId,
-        moduleTransformations,
+        modulesTransformations?.[importRawModuleId],
       );
 
       graph?.mergeEdge(id, importModuleId);
@@ -243,7 +248,7 @@ export function moduleScanTraversal(
 
         const [importModuleId] = resolveModule(
           importRawModuleId,
-          moduleTransformations,
+          modulesTransformations?.[importRawModuleId],
         );
 
         graph?.mergeEdge(id, importModuleId);
@@ -262,7 +267,7 @@ export function moduleScanTraversal(
 
           const [importModuleId] = resolveModule(
             importRawModuleId,
-            moduleTransformations,
+            modulesTransformations?.[importRawModuleId],
           );
 
           graph?.mergeEdge(id, importModuleId);
@@ -294,7 +299,7 @@ export function moduleScanTraversal(
 export function traverseModule(
   logger: ConsolaInstance,
   file: File,
-  transformations: ModuleTransformations | null | undefined,
+  modulesTransformations: ChunkModulesTransformations | null | undefined,
   isCommonJS: boolean,
   chunkModules: ChunkModules,
   chunkModuleParams: string[],
@@ -469,7 +474,7 @@ export function traverseModule(
 
         const [, importModulePath] = resolveModule(
           importRawModuleId,
-          transformations,
+          modulesTransformations?.[importRawModuleId],
         );
 
         let useRequire = isCommonJS;
@@ -517,7 +522,7 @@ export function traverseModule(
 
         const [importModuleId, importModulePath] = resolveModule(
           importRawModuleId,
-          transformations,
+          modulesTransformations?.[importRawModuleId],
         );
 
         if (isCommonJS) {
@@ -582,7 +587,7 @@ export function traverseModule(
 
           const [, importModulePath] = resolveModule(
             importRawModuleId,
-            transformations,
+            modulesTransformations?.[importRawModuleId],
           );
 
           if (!isIdentifier(path.node.id)) {
