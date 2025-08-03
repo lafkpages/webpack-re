@@ -388,7 +388,7 @@ export function traverseModule(
 
                       if (!isIdentifier(property.value.body.body[0].argument)) {
                         logger.warn(
-                          "Invalid export property value body:",
+                          "Invalid export property value body argument:",
                           property.value.body.body[0].argument.type,
                         );
                         continue;
@@ -397,7 +397,7 @@ export function traverseModule(
                       exportedVar = property.value.body.body[0].argument.name;
                     } else if (property.value.body.body.length) {
                       logger.warn(
-                        "Invalid export property value body:",
+                        "Invalid export property value body length:",
                         property.value.body.body.length,
                       );
                       continue;
