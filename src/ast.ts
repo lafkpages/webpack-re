@@ -410,6 +410,8 @@ export function traverseModule(
                   } else {
                     const statementParent = path.getStatementParent()!;
 
+                    logger.info("Rewriting export", property.key.name);
+
                     statementParent.insertBefore(
                       exportNamedDeclaration(
                         variableDeclaration("const", [
