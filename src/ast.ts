@@ -422,12 +422,7 @@ export function traverseModule(
                   }
 
                   if (exportedVar) {
-                    const statementParent = path.getStatementParent();
-
-                    if (!statementParent) {
-                      logger.warn("No statement parent for export found");
-                      continue;
-                    }
+                    const statementParent = path.getStatementParent()!;
 
                     const exportAs = property.key.name;
 
