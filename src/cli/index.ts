@@ -148,9 +148,10 @@ program
 
     let chunkCount = 0;
 
-    for (const file of files) {
+    for (const filepath of files) {
       const chunkModules = await splitWebpackChunk(
-        await Bun.file(file).text(),
+        filepath,
+        await Bun.file(filepath).text(),
         {
           esmDefaultExports: options.esmDefaultExports,
           includeVariableDeclarationComments:
@@ -166,7 +167,7 @@ program
       );
 
       if (!chunkModules) {
-        consola.warn("Invalid chunk:", file);
+        consola.warn("Invalid chunk:", filepath);
         continue;
       }
 

@@ -45,7 +45,8 @@ export interface ChunkModules {
 }
 
 export interface Chunk {
-  id: string | number;
+  id: string;
+  ids: (string | number)[];
   modules: ChunkModules;
 }
 
@@ -61,6 +62,7 @@ export interface ChunkModulesTransformations {
 }
 
 export async function splitWebpackChunk(
+  chunkFilename: string,
   chunkSrc: string,
   {
     esmDefaultExports,
@@ -84,8 +86,16 @@ export async function splitWebpackChunk(
     write: false | string;
   },
 ): Promise<Chunk | null> {
+  const chunkId = chunkFilename.match(/(?:^|\/)([^\/]+)\.js$/i)?.[1];
+
+  if (!chunkId) {
+    throw new Error(
+      `Invalid chunk filename: ${chunkFilename}. Expected format: <chunk-id>.js`,
+    );
+  }
+
   const m = chunkSrc.match(
-    /(\((self\.webpackChunk(\w*))=\2\|\|\[\]\)\.push\()\[\[([^\]]+)\],(\{.+\})]\);/s,
+    /(\((self\.webpackChunk(\w*))=\2\|\|\[\]\)\.push\()\[(\[[^\]]+\]),(\{.+\})]\);/s,
   );
 
   if (!m) {
@@ -93,7 +103,8 @@ export async function splitWebpackChunk(
   }
 
   // TODO: improve RegEx to only allow strings and numbers
-  const chunkId = JSON.parse(m[4]) as string | number;
+  // TODO: figure out the naming for this (chunkId vs chunkIds? what do these even represent?)
+  const chunkIds = JSON.parse(m[4]) as (string | number)[];
   const chunkModulesSrc = `(${m[5]}, 0)`;
 
   const chunkLogger = consola.withTag(chunkId.toString());
@@ -290,6 +301,7 @@ ${formattedModuleCode}`,
 
   return {
     id: chunkId,
+    ids: chunkIds,
     modules: chunkModules,
   };
 }
