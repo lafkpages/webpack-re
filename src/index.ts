@@ -212,7 +212,7 @@ export async function splitWebpackChunk(
       moduleLogger,
       moduleFile,
       moduleId,
-      modulesTransformations?.[rawModuleId],
+      modulesTransformations,
       graph,
       chunkModuleParams,
     );
