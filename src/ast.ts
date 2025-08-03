@@ -666,6 +666,7 @@ export function traverseModule(
             return;
           }
 
+          // TODO: consider using Scope.generateDeclaredUidIdentifier instead
           const exportsId = path.scope.generateUidIdentifier("exports");
           statementParent.insertBefore(
             variableDeclaration("const", [
