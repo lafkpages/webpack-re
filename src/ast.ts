@@ -408,11 +408,15 @@ export function traverseModule(
                   } else if (isIdentifier(property.value.body)) {
                     exportedVar = property.value.body.name;
                   } else {
-                    logger.warn(
-                      "Invalid export property value body:",
-                      property.value.body.type,
+                    const statementParent = path.getStatementParent()!;
+
+                    statementParent.insertBefore(
+                      exportNamedDeclaration(
+                        variableDeclaration("const", [
+                          variableDeclarator(property.key, property.value.body),
+                        ]),
+                      ),
                     );
-                    continue;
                   }
 
                   if (exportedVar) {
