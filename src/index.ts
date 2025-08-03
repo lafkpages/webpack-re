@@ -85,7 +85,7 @@ export async function splitWebpackChunk(
   },
 ): Promise<Chunk | null> {
   const m = chunkSrc.match(
-    /(\((self\.webpackChunk(\w*))=\2\|\|\[\]\)\.push\()\[\[(\d+)\],(\{.+\})]\);/s,
+    /(\((self\.webpackChunk(\w*))=\2\|\|\[\]\)\.push\()\[\[([^\]]+)\],(\{.+\})]\);/s,
   );
 
   if (!m) {
