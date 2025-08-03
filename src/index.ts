@@ -45,7 +45,7 @@ export interface ChunkModules {
 }
 
 export interface Chunk {
-  id: number;
+  id: string | number;
   modules: ChunkModules;
 }
 
@@ -92,7 +92,8 @@ export async function splitWebpackChunk(
     return null;
   }
 
-  const chunkId = parseInt(m[4]);
+  // TODO: improve RegEx to only allow strings and numbers
+  const chunkId = JSON.parse(m[4]) as string | number;
   const chunkModulesSrc = `(${m[5]}, 0)`;
 
   const chunkLogger = consola.withTag(chunkId.toString());
