@@ -11,9 +11,16 @@ export default function registerScrapeCommand<T extends CLI>(program: T) {
     .argument("<url>", "URL to scrape")
     .argument("<outdir>", "Output directory")
     .option("--rm", "Remove the output directory before writing")
+    .option(
+      "--matching <pattern>",
+      "Only scrape URLs matching the given RegExp pattern",
+    )
 
     .action(async (urlString, outdir, options) => {
       const url = new URL(urlString);
+      const regexp = options.matching
+        ? new RegExp(options.matching, "i")
+        : null;
 
       outdir = resolve(outdir);
 
@@ -32,8 +39,11 @@ export default function registerScrapeCommand<T extends CLI>(program: T) {
           if (type && type !== "text/javascript") return;
 
           const srcUrl = new URL(src, url);
+          const matches = regexp ? regexp.test(srcUrl.href) : true;
 
-          consola.debug("Found script:", srcUrl.href);
+          consola.debug("Found script:", srcUrl.href, matches);
+
+          if (!matches) return;
 
           fetch(srcUrl.href).then(async (resp) => {
             const path = resolve(
