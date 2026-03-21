@@ -2,6 +2,7 @@ import { program } from "@commander-js/extra-typings";
 import consola, { LogLevels } from "consola";
 
 import { version } from "../../package.json";
+import registerScrapeCommand from "./commands/scrape";
 import registerSplitCommand from "./commands/split";
 
 consola.wrapConsole();
@@ -33,6 +34,7 @@ const cli = program
 
 export type CLI = typeof cli;
 
+registerScrapeCommand(cli);
 registerSplitCommand(cli);
 
 await cli.parseAsync();
