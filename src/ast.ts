@@ -17,10 +17,12 @@ import traverse from "@babel/traverse";
 import {
   assignmentExpression,
   awaitExpression,
+  booleanLiteral,
   callExpression,
   exportDefaultDeclaration,
   exportNamedDeclaration,
   exportSpecifier,
+  expressionStatement,
   identifier,
   importDeclaration,
   importDefaultSpecifier,
@@ -761,6 +763,31 @@ export function traverseModule(
         path.node.exported.name,
         "to match export",
       );
+    },
+
+    // Expand some common minified code patterns
+    ExpressionStatement(path) {
+      if (!isSequenceExpression(path.node.expression)) {
+        return;
+      }
+
+      path.replaceWithMultiple(
+        path.node.expression.expressions.map((e) => expressionStatement(e)),
+      );
+    },
+    UnaryExpression(path) {
+      if (path.node.operator === "!" && isNumericLiteral(path.node.argument)) {
+        path.replaceWith(booleanLiteral(!path.node.argument.value));
+      }
+    },
+    VariableDeclaration(path) {
+      if (path.node.declarations.length > 1) {
+        path.replaceWithMultiple(
+          path.node.declarations.map((declarator) =>
+            variableDeclaration(path.node.kind, [declarator]),
+          ),
+        );
+      }
     },
   });
 }
