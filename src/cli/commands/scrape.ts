@@ -36,7 +36,11 @@ export default function registerScrapeCommand<T extends CLI>(program: T) {
           consola.debug("Found script:", srcUrl.href);
 
           fetch(srcUrl.href).then(async (resp) => {
-            const path = resolve(outdir, srcUrl.pathname.slice(1));
+            const path = resolve(
+              outdir,
+              srcUrl.hostname,
+              srcUrl.pathname.slice(1),
+            );
 
             consola.debug("Saving to:", path);
 
