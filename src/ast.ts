@@ -17,6 +17,7 @@ import traverse from "@babel/traverse";
 import {
   assignmentExpression,
   awaitExpression,
+  blockStatement,
   booleanLiteral,
   callExpression,
   exportDefaultDeclaration,
@@ -701,7 +702,7 @@ export function traverseModule(
           const local = path.node.right.name;
           const exported = path.node.left.property.name;
 
-          logger.info("Rewriting export of", local, "as", exported);
+          logger.info("Rewriting export", exported, "of", local);
 
           const statementParent = path.getStatementParent();
 
@@ -721,16 +722,26 @@ export function traverseModule(
           } else {
             path.replaceWith(path.node.right);
           }
-        } else if (isFunctionExpression(path.node.right)) {
-          if (path.node.right.id) {
-            logger.warn(
-              "Named function expressions are not supported, got:",
-              path.node.right.id.type,
+        } else if (
+          isFunctionExpression(path.node.right) ||
+          isArrowFunctionExpression(path.node.right)
+        ) {
+          if ("id" in path.node.right && path.node.right.id) {
+            const didRename = rename(
+              logger,
+              path.get("right").scope,
+              path.node.right.id.name,
+              path.node.left.property.name,
+              "to match export",
             );
-            return;
+
+            if (!didRename) {
+              logger.warn("Could not rename function for export");
+              return;
+            }
           }
 
-          logger.info("Rewriting export of", path.node.left.property.name);
+          logger.info("Rewriting export", path.node.left.property.name);
 
           const statementParent = path.getStatementParent();
 
@@ -744,7 +755,9 @@ export function traverseModule(
               functionDeclaration(
                 path.node.left.property,
                 path.node.right.params,
-                path.node.right.body,
+                isBlockStatement(path.node.right.body)
+                  ? path.node.right.body
+                  : blockStatement([expressionStatement(path.node.right.body)]),
                 path.node.right.generator,
                 path.node.right.async,
               ),
@@ -754,11 +767,50 @@ export function traverseModule(
           // TODO: check if return value is used
           path.remove();
         } else {
-          logger.warn(
-            "Non-identifier exports not supported, got:",
-            path.node.right.type,
-          );
-          return;
+          logger.info("Rewriting export", path.node.left.property.name);
+
+          const statementParent = path.getStatementParent();
+
+          if (!statementParent) {
+            logger.warn("No statement parent for export found");
+            return;
+          }
+
+          const parentIsExpressionStatement =
+            path.parentPath.isExpressionStatement();
+
+          if (
+            parentIsExpressionStatement &&
+            !path.scope.hasBinding(path.node.left.property.name)
+          ) {
+            statementParent.insertBefore(
+              exportNamedDeclaration(
+                variableDeclaration("const", [
+                  variableDeclarator(path.node.left.property, path.node.right),
+                ]),
+              ),
+            );
+            path.remove();
+          } else {
+            const exportedVar = path.scope.generateUidIdentifier(
+              path.node.left.property.name,
+            );
+
+            statementParent.insertBefore([
+              variableDeclaration("const", [
+                variableDeclarator(exportedVar, path.node.right),
+              ]),
+              exportNamedDeclaration(null, [
+                exportSpecifier(exportedVar, path.node.left.property),
+              ]),
+            ]);
+
+            if (parentIsExpressionStatement) {
+              path.remove();
+            } else {
+              path.replaceWith(exportedVar);
+            }
+          }
         }
       }
     },
