@@ -410,10 +410,10 @@ export function traverseModule(
                         property.value.body.body.length,
                       );
                       continue;
+                    } else {
+                      // TODO: void export
+                      logger.warn("Void exports not implemented");
                     }
-
-                    // TODO: void export
-                    logger.warn("Void exports not implemented");
                   } else if (isIdentifier(property.value.body)) {
                     exportedVar = property.value.body.name;
                   } else {
