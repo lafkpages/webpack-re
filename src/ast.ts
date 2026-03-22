@@ -23,6 +23,7 @@ import {
   exportNamedDeclaration,
   exportSpecifier,
   expressionStatement,
+  functionDeclaration,
   identifier,
   importDeclaration,
   importDefaultSpecifier,
@@ -696,34 +697,69 @@ export function traverseModule(
         path.node.left.object.name === chunkModuleParams[1] &&
         !path.scope.hasBinding(path.node.left.object.name)
       ) {
-        if (!isIdentifier(path.node.right)) {
+        if (isIdentifier(path.node.right)) {
+          const local = path.node.right.name;
+          const exported = path.node.left.property.name;
+
+          logger.info("Rewriting export of", local, "as", exported);
+
+          const statementParent = path.getStatementParent();
+
+          if (!statementParent) {
+            logger.warn("No statement parent for export found");
+            return;
+          }
+
+          statementParent.insertBefore(
+            exportNamedDeclaration(null, [
+              exportSpecifier(identifier(local), identifier(exported)),
+            ]),
+          );
+
+          if (path.parentPath.isExpressionStatement()) {
+            path.remove();
+          } else {
+            path.replaceWith(path.node.right);
+          }
+        } else if (isFunctionExpression(path.node.right)) {
+          if (path.node.right.id) {
+            logger.warn(
+              "Named function expressions are not supported, got:",
+              path.node.right.id.type,
+            );
+            return;
+          }
+
+          logger.info("Rewriting export of", path.node.left.property.name);
+
+          const statementParent = path.getStatementParent();
+
+          if (!statementParent) {
+            logger.warn("No statement parent for export found");
+            return;
+          }
+
+          statementParent.insertBefore(
+            exportNamedDeclaration(
+              functionDeclaration(
+                path.node.left.property,
+                path.node.right.params,
+                path.node.right.body,
+                path.node.right.generator,
+                path.node.right.async,
+              ),
+            ),
+          );
+
+          // TODO: check if return value is used
+          path.remove();
+        } else {
           logger.warn(
             "Non-identifier exports not supported, got:",
             path.node.right.type,
           );
           return;
         }
-
-        const local = path.node.right.name;
-        const exported = path.node.left.property.name;
-
-        logger.info("Rewriting export of", local);
-
-        const statementParent = path.getStatementParent();
-
-        if (!statementParent) {
-          logger.warn("No statement parent for export found");
-          return;
-        }
-
-        statementParent.insertBefore(
-          exportNamedDeclaration(null, [
-            exportSpecifier(identifier(local), identifier(exported)),
-          ]),
-        );
-
-        // TODO: check if return value is used
-        path.remove();
       }
     },
     Identifier(path) {
