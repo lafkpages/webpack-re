@@ -127,7 +127,7 @@ export function parseImportCall(
         return null;
       }
 
-      const importArgument = callExpression.arguments[0];
+      const importArgument = callExpression.arguments[0]!;
 
       if (
         !isNumericLiteral(importArgument) &&
@@ -191,7 +191,7 @@ export function rename(
 export function resolveModule(
   moduleId: string | number,
   moduleTransformations?: ModuleTransformations | null,
-) {
+): [string, string] {
   if (moduleTransformations?.renameModule) {
     return [
       moduleTransformations.renameModule,
@@ -334,13 +334,13 @@ export function traverseModule(
                 ) {
                   logger.warn(
                     "Invalid export first argument:",
-                    path.node.arguments[0].type,
+                    path.node.arguments[0]!.type,
                   );
                   return;
                 }
 
                 if (!isObjectExpression(path.node.arguments[1])) {
-                  logger.warn("Invalid exports:", path.node.arguments[1].type);
+                  logger.warn("Invalid exports:", path.node.arguments[1]!.type);
                   return;
                 }
 
@@ -384,7 +384,7 @@ export function traverseModule(
                       if (!isReturnStatement(property.value.body.body[0])) {
                         logger.warn(
                           "Invalid export property value body:",
-                          property.value.body.body[0].type,
+                          property.value.body.body[0]!.type,
                         );
                         continue;
                       }
