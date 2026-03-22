@@ -784,11 +784,16 @@ export function traverseModule(
             !path.scope.hasBinding(path.node.left.property.name)
           ) {
             statementParent.insertBefore(
-              exportNamedDeclaration(
-                variableDeclaration("const", [
-                  variableDeclarator(path.node.left.property, path.node.right),
-                ]),
-              ),
+              path.node.left.property.name === "default"
+                ? exportDefaultDeclaration(path.node.right)
+                : exportNamedDeclaration(
+                    variableDeclaration("const", [
+                      variableDeclarator(
+                        path.node.left.property,
+                        path.node.right,
+                      ),
+                    ]),
+                  ),
             );
             path.remove();
           } else {
